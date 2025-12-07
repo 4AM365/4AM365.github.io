@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>William Craig - ML Engineer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body data-theme="dark">
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="#home" class="nav-logo">WC</a>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="#home" class="nav-link active" data-page="home">Home</a>
+                </li>
+                <li class="nav-item">
+                    <a href="#about" class="nav-link" data-page="about">About</a>
+                </li>
+                <li class="nav-item">
+                    <a href="#blog" class="nav-link" data-page="blog">Blog</a>
+                </li>
+                <li class="nav-item">
+                    <a href="#notes" class="nav-link" data-page="notes">Notes</a>
+                </li>
+            </ul>
+            <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+                <span class="theme-icon">◐</span>
+            </button>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <!-- HOME PAGE -->
+        <section id="home" class="page active">
+            <div class="hero">
+                <h1 class="hero-title">
+                    <span class="glitch" data-text="William Craig">William Craig</span>
+                </h1>
+                <p class="hero-subtitle">Machine Learning Engineer</p>
+                <p class="hero-description">
+                    Building intelligent systems for the real world. Bridging ML theory and hardware reality.
+                </p>
+                <div class="hero-links">
+                    <a href="https://github.com/yourusername" target="_blank" class="hero-link">GitHub</a>
+                    <a href="https://linkedin.com/in/yourusername" target="_blank" class="hero-link">LinkedIn</a>
+                    <a href="mailto:wtcraig@live.com" class="hero-link">Contact</a>
+                </div>
+            </div>
+
+            <div class="featured-section">
+                <h2 class="section-title">Featured Projects</h2>
+                <div class="projects-grid">
+                    <div class="project-card">
+                        <div class="project-header">
+                            <h3 class="project-title">CARLA/AutoSAR Simulation</h3>
+                            <div class="project-tags">
+                                <span class="tag">ML</span>
+                                <span class="tag">Robotics</span>
+                                <span class="tag">ADAS</span>
+                            </div>
+                        </div>
+                        <p class="project-description">
+                            Digital-twin environments for validating autonomous driving systems with containerized workflows.
+                        </p>
+                        <a href="#" class="project-link">View Project →</a>
+                    </div>
+
+                    <div class="project-card">
+                        <div class="project-header">
+                            <h3 class="project-title">Fleet Telematics AI</h3>
+                            <div class="project-tags">
+                                <span class="tag">ML</span>
+                                <span class="tag">Data Science</span>
+                                <span class="tag">IoT</span>
+                            </div>
+                        </div>
+                        <p class="project-description">
+                            Predictive maintenance and anomaly detection for commercial vehicle fleets using real-world telemetry data.
+                        </p>
+                        <a href="#" class="project-link">View Project →</a>
+                    </div>
+
+                    <div class="project-card">
+                        <div class="project-header">
+                            <h3 class="project-title">ROS2 ML Integration</h3>
+                            <div class="project-tags">
+                                <span class="tag">ML</span>
+                                <span class="tag">ROS2</span>
+                                <span class="tag">CV</span>
+                            </div>
+                        </div>
+                        <p class="project-description">
+                            Real-time machine learning implementation in ROS2 for autonomous robotics applications.
+                        </p>
+                        <a href="#" class="project-link">View Project →</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="skills-section">
+                <h2 class="section-title">Technical Stack</h2>
+                <div class="skills-grid">
+                    <div class="skill-category">
+                        <h3 class="skill-category-title">Machine Learning</h3>
+                        <ul class="skill-list">
+                            <li>PyTorch / TensorFlow</li>
+                            <li>Computer Vision</li>
+                            <li>Time-Series Analysis</li>
+                            <li>MLOps & Deployment</li>
+                        </ul>
+                    </div>
+                    <div class="skill-category">
+                        <h3 class="skill-category-title">Robotics & Systems</h3>
+                        <ul class="skill-list">
+                            <li>ROS2</li>
+                            <li>CARLA / AutoSAR</li>
+                            <li>Sensor Fusion</li>
+                            <li>Embedded Systems</li>
+                        </ul>
+                    </div>
+                    <div class="skill-category">
+                        <h3 class="skill-category-title">Engineering</h3>
+                        <ul class="skill-list">
+                            <li>Python / C++</li>
+                            <li>CAD / Fusion 360</li>
+                            <li>Rapid Prototyping</li>
+                            <li>Systems Integration</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ABOUT PAGE -->
+        <section id="about" class="page">
+            <div class="page-content">
+                <h1 class="page-title">About Me</h1>
+                
+                <div class="about-content">
+                    <div class="about-text">
+                        <p class="lead-text">
+                            I've built things my entire life—from leading a Formula SAE team through complete vehicle 
+                            development to holding patents in automotive electronics to shipping products customers actually buy.
+                        </p>
+                        
+                        <p>
+                            But I'm not a "jack of all trades"—I'm focused on one thing: <strong>building intelligent 
+                            systems that work in the real world</strong>. My path through mechanical engineering, electronics, 
+                            and product development wasn't wandering—it was building the foundation to do ML right.
+                        </p>
+
+                        <p>
+                            Most ML engineers understand algorithms. I also understand the hardware constraints, failure modes, 
+                            manufacturing realities, and systems integration challenges that determine whether models actually 
+                            deploy successfully.
+                        </p>
+
+                        <h2 class="subsection-title">Background</h2>
+                        
+                        <div class="timeline">
+                            <div class="timeline-item">
+                                <div class="timeline-marker"></div>
+                                <div class="timeline-content">
+                                    <h3>Formula SAE Team Captain</h3>
+                                    <p>Led 30-person team through complete vehicle development cycle, managing systems 
+                                    integration and cross-functional engineering coordination.</p>
+                                </div>
+                            </div>
+                            
+                            <div class="timeline-item">
+                                <div class="timeline-marker"></div>
+                                <div class="timeline-content">
+                                    <h3>Engineering & Patents</h3>
+                                    <p>Professional Engineer (PE) with 2 granted patents in vehicle electronics. 
+                                    Contributed to 3 additional patents in fleet management systems.</p>
+                                </div>
+                            </div>
+                            
+                            <div class="timeline-item">
+                                <div class="timeline-marker"></div>
+                                <div class="timeline-content">
+                                    <h3>ML & Autonomous Systems</h3>
+                                    <p>Current focus on machine learning for robotics, autonomous vehicles, and 
+                                    real-world system optimization.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h2 class="subsection-title">Education & Certifications</h2>
+                        <ul class="credentials-list">
+                            <li><strong>M.S. Engineering</strong> - Arizona State University (GPA: 3.76)</li>
+                            <li><strong>B.S. Engineering (Electrical Systems)</strong> - Arizona State University</li>
+                            <li><strong>Professional Engineer (PE)</strong> - Mechanical: Machine Design & Materials</li>
+                            <li><strong>ASE Certified Master Automotive Technician</strong></li>
+                            <li><strong>Certified Fire and Explosion Investigator (CFEI)</strong></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- BLOG PAGE -->
+        <section id="blog" class="page">
+            <div class="page-content">
+                <h1 class="page-title">Blog</h1>
+                
+                <div class="blog-grid">
+                    <article class="blog-post">
+                        <div class="post-meta">
+                            <span class="post-date">December 2024</span>
+                            <span class="post-category">Machine Learning</span>
+                        </div>
+                        <h2 class="post-title">Coming Soon: First Post</h2>
+                        <p class="post-excerpt">
+                            I'll be sharing insights on ML system design, autonomous vehicles, and bridging 
+                            the gap between algorithms and hardware.
+                        </p>
+                        <a href="#" class="post-link">Read More →</a>
+                    </article>
+
+                    <article class="blog-post">
+                        <div class="post-meta">
+                            <span class="post-date">TBD</span>
+                            <span class="post-category">Robotics</span>
+                        </div>
+                        <h2 class="post-title">ROS2 + ML: Lessons Learned</h2>
+                        <p class="post-excerpt">
+                            Practical insights from integrating machine learning models into ROS2 for 
+                            real-time robotics applications.
+                        </p>
+                        <a href="#" class="post-link">Read More →</a>
+                    </article>
+
+                    <article class="blog-post">
+                        <div class="post-meta">
+                            <span class="post-date">TBD</span>
+                            <span class="post-category">Engineering</span>
+                        </div>
+                        <h2 class="post-title">From Formula SAE to ML Engineering</h2>
+                        <p class="post-excerpt">
+                            How systems thinking from motorsports translates to building production ML systems.
+                        </p>
+                        <a href="#" class="post-link">Read More →</a>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- NOTES PAGE -->
+        <section id="notes" class="page">
+            <div class="page-content">
+                <h1 class="page-title">Technical Notes</h1>
+                
+                <div class="notes-grid">
+                    <div class="note-card">
+                        <div class="note-header">
+                            <span class="note-icon">📝</span>
+                            <h3 class="note-title">ML System Design Patterns</h3>
+                        </div>
+                        <p class="note-description">
+                            Collection of architectural patterns for deploying ML models in production environments.
+                        </p>
+                        <div class="note-tags">
+                            <span class="tag">MLOps</span>
+                            <span class="tag">Architecture</span>
+                        </div>
+                    </div>
+
+                    <div class="note-card">
+                        <div class="note-header">
+                            <span class="note-icon">🤖</span>
+                            <h3 class="note-title">ROS2 Quick Reference</h3>
+                        </div>
+                        <p class="note-description">
+                            Personal reference guide for ROS2 development, node architecture, and common patterns.
+                        </p>
+                        <div class="note-tags">
+                            <span class="tag">ROS2</span>
+                            <span class="tag">Robotics</span>
+                        </div>
+                    </div>
+
+                    <div class="note-card">
+                        <div class="note-header">
+                            <span class="note-icon">🚗</span>
+                            <h3 class="note-title">Automotive CAN Protocol</h3>
+                        </div>
+                        <p class="note-description">
+                            Notes on CAN bus analysis, J1939 protocol, and automotive diagnostics for ML feature engineering.
+                        </p>
+                        <div class="note-tags">
+                            <span class="tag">Automotive</span>
+                            <span class="tag">Protocols</span>
+                        </div>
+                    </div>
+
+                    <div class="note-card">
+                        <div class="note-header">
+                            <span class="note-icon">⚡</span>
+                            <h3 class="note-title">PyTorch Performance Tips</h3>
+                        </div>
+                        <p class="note-description">
+                            Optimization techniques for training and inference, memory management, and profiling.
+                        </p>
+                        <div class="note-tags">
+                            <span class="tag">PyTorch</span>
+                            <span class="tag">Optimization</span>
+                        </div>
+                    </div>
+
+                    <div class="note-card">
+                        <div class="note-header">
+                            <span class="note-icon">🔧</span>
+                            <h3 class="note-title">Hardware-ML Integration</h3>
+                        </div>
+                        <p class="note-description">
+                            Practical considerations for deploying ML on embedded systems and edge devices.
+                        </p>
+                        <div class="note-tags">
+                            <span class="tag">Embedded</span>
+                            <span class="tag">Edge AI</span>
+                        </div>
+                    </div>
+
+                    <div class="note-card">
+                        <div class="note-header">
+                            <span class="note-icon">📊</span>
+                            <h3 class="note-title">Time-Series ML Methods</h3>
+                        </div>
+                        <p class="note-description">
+                            Approaches for time-series forecasting, anomaly detection, and sequential data modeling.
+                        </p>
+                        <div class="note-tags">
+                            <span class="tag">Time-Series</span>
+                            <span class="tag">ML</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <p>&copy; 2024 William Craig. Built with focus.</p>
+            <div class="footer-links">
+                <a href="https://github.com/yourusername" target="_blank">GitHub</a>
+                <a href="https://linkedin.com/in/yourusername" target="_blank">LinkedIn</a>
+                <a href="mailto:wtcraig@live.com">Email</a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
