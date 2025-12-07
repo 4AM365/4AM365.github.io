@@ -1,2 +1,5 @@
 # 4AM365.github.io
-#WilliamCraig Mechanical Engineer (PE) + accident reconstructionist learning ML Eng to build the safety systems that prevent the accidents I currently investigate. This site documents my journey and technical projects in computer vision, robotics, and autonomous systems.
+
+William Craig | Mechanical Engineer (PE) + accident reconstructionist learning ML Eng to build safety systems that prevent the accidents I investigate.
+
+This site documents my journey and technical projects in computer vision, robotics, and autonomous systems.
