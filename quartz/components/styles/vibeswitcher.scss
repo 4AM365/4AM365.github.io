@@ -1,0 +1,41 @@
+.vibe-switcher {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+  font-family: var(--codeFont);
+
+  .vibe-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--gray);
+    margin-right: 0.25rem;
+  }
+
+  .vibe-btn {
+    font-family: var(--codeFont);
+    font-size: 0.7rem;
+    text-transform: lowercase;
+    letter-spacing: 0.04em;
+    padding: 0.15rem 0.5rem;
+    border: 1px solid var(--gray);
+    background: transparent;
+    color: var(--gray);
+    cursor: pointer;
+    transition: all 0.12s ease;
+    border-radius: 0;
+
+    &:hover {
+      color: var(--secondary);
+      border-color: var(--secondary);
+    }
+
+    &.active {
+      background: var(--secondary);
+      color: var(--light);
+      border-color: var(--secondary);
+    }
+  }
+}

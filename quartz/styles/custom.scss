@@ -1,61 +1,38 @@
 @use "./base.scss";
 
+// Three vibes, switched by [saved-vibe] on <html>.
+// Default = jdm. The base theme colors come from quartz.config.ts and
+// match the jdm vibe; geocities and coder override them via variables.
+
 // =============================================================================
-// FAMES — 90s JDM aesthetic
-// Technical-document / dashboard-at-night feel. Sharp corners, hairline
-// borders, instrument-cluster accent colors, monospace headers.
+// VIBE 1 — JDM (white / purple)
+// Default. Clean technical-document feel, lavender accents.
 // =============================================================================
 
-// --- Global: no rounded corners anywhere ------------------------------------
-*,
-*::before,
-*::after {
-  border-radius: 0 !important;
+:root[saved-vibe="jdm"],
+:root:not([saved-vibe]) {
+  --headerFont: "JetBrains Mono", monospace;
+  --bodyFont: "IBM Plex Sans", sans-serif;
+  --codeFont: "JetBrains Mono", monospace;
 }
 
-// --- Body: technical document feel, subtle scanline overlay -----------------
-body {
-  background-image:
-    repeating-linear-gradient(
-      0deg,
-      transparent 0,
-      transparent 2px,
-      rgba(0, 0, 0, 0.018) 2px,
-      rgba(0, 0, 0, 0.018) 3px
-    );
-}
-
-:root[saved-theme="dark"] body {
-  background-image:
-    repeating-linear-gradient(
-      0deg,
-      transparent 0,
-      transparent 2px,
-      rgba(255, 255, 255, 0.025) 2px,
-      rgba(255, 255, 255, 0.025) 3px
-    );
-}
-
-// --- Headings: monospace, uppercase, tracked, with a left bar --------------
-article {
+:root[saved-vibe="jdm"] article,
+:root:not([saved-vibe]) article {
   h1, h2, h3, h4 {
     font-family: var(--headerFont);
     letter-spacing: 0.04em;
     text-transform: uppercase;
     font-weight: 700;
   }
-
   h1 {
     border-bottom: 2px solid var(--secondary);
     padding-bottom: 0.4rem;
     letter-spacing: 0.06em;
   }
-
   h2 {
     position: relative;
     padding-left: 0.8rem;
     margin-top: 2.4rem;
-
     &::before {
       content: "";
       position: absolute;
@@ -66,66 +43,45 @@ article {
       background: var(--secondary);
     }
   }
-
   h3 {
     color: var(--secondary);
     font-size: 1.05rem;
   }
-}
 
-// --- Links: technical underline with cyan hover swap ------------------------
-article a,
-.page-title a {
-  color: var(--secondary);
-  text-decoration: none;
-  border-bottom: 1px solid currentColor;
-  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
-
-  &:hover {
-    color: var(--tertiary);
-    border-bottom-color: var(--tertiary);
-    background: rgba(0, 212, 255, 0.06);
+  a {
+    color: var(--secondary);
+    text-decoration: none;
+    border-bottom: 1px solid currentColor;
+    transition: color 0.12s ease, background 0.12s ease;
+    &:hover {
+      color: var(--tertiary);
+      background: rgba(167, 139, 250, 0.10);
+    }
   }
 }
 
-// --- Page title: site header tightened, katakana accent --------------------
-.page-title {
-  font-family: var(--headerFont);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  font-weight: 800;
-
-  a { border-bottom: none; }
+:root[saved-vibe="jdm"] *,
+:root[saved-vibe="jdm"] *::before,
+:root[saved-vibe="jdm"] *::after,
+:root:not([saved-vibe]) *,
+:root:not([saved-vibe]) *::before,
+:root:not([saved-vibe]) *::after {
+  border-radius: 0 !important;
 }
 
-// --- Code blocks: instrument-readout feel, sharp red border -----------------
-pre,
-code:not(pre code) {
+:root[saved-vibe="jdm"] pre,
+:root:not([saved-vibe]) pre {
   border: 1px solid var(--lightgray);
-  font-family: var(--codeFont);
-}
-
-pre {
   border-left: 3px solid var(--secondary);
-  background: var(--light);
   padding: 0.9rem 1.1rem !important;
 }
 
-code:not(pre code) {
-  background: var(--lightgray);
-  padding: 0.05em 0.35em;
-  color: var(--dark);
-}
-
-// --- Blockquotes: technical-note callout ------------------------------------
-blockquote {
+:root[saved-vibe="jdm"] blockquote,
+:root:not([saved-vibe]) blockquote {
   border-left: 3px solid var(--tertiary);
-  background: rgba(0, 212, 255, 0.04);
+  background: rgba(167, 139, 250, 0.06);
   padding: 0.6rem 1rem;
-  margin: 1.2rem 0;
   font-style: normal;
-  color: var(--darkgray);
-
   &::before {
     content: "// NOTE  ";
     color: var(--tertiary);
@@ -136,113 +92,364 @@ blockquote {
   }
 }
 
-:root[saved-theme="dark"] blockquote {
-  background: rgba(0, 212, 255, 0.05);
-}
-
-// --- Tags: part-number plates -----------------------------------------------
-.tags a.internal.tag-link {
-  background: transparent;
-  border: 1px solid var(--secondary);
-  color: var(--secondary);
-  font-family: var(--codeFont);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-size: 0.72rem;
-  padding: 0.15rem 0.5rem;
-  margin: 0 0.25rem 0.25rem 0;
-
-  &::before { content: "#"; opacity: 0.6; }
-
-  &:hover {
-    background: var(--secondary);
-    color: var(--light);
-  }
-}
-
-// --- Tables: data-sheet feel ------------------------------------------------
-table {
-  border: 1px solid var(--gray);
-  font-family: var(--codeFont);
-  font-size: 0.85rem;
-}
-
-th {
-  background: var(--secondary);
-  color: var(--light);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-right: 1px solid var(--gray);
-}
-
-td {
-  border-right: 1px solid var(--lightgray);
-  border-bottom: 1px solid var(--lightgray);
-}
-
-// --- Horizontal rule: heavier, JDM stripe -----------------------------------
-hr {
+:root[saved-vibe="jdm"] hr,
+:root:not([saved-vibe]) hr {
   border: none;
   height: 2px;
   background: linear-gradient(
     to right,
     var(--secondary) 0,
-    var(--secondary) 33%,
-    var(--lightgray) 33%,
-    var(--lightgray) 66%,
-    var(--tertiary) 66%,
+    var(--secondary) 50%,
+    var(--tertiary) 50%,
     var(--tertiary) 100%
   );
   margin: 2rem 0;
 }
 
-// --- Search: terminal-prompt feel ------------------------------------------
-.search-button {
-  border: 1px solid var(--gray) !important;
+:root[saved-vibe="jdm"] table,
+:root:not([saved-vibe]) table {
+  border: 1px solid var(--gray);
   font-family: var(--codeFont);
+  font-size: 0.85rem;
+}
+:root[saved-vibe="jdm"] th,
+:root:not([saved-vibe]) th {
+  background: var(--secondary);
+  color: var(--light);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
 }
 
-// --- Explorer (sidebar): instrument-panel column ---------------------------
-.explorer {
+// =============================================================================
+// VIBE 2 — Geocities (90s personal homepage)
+// Comic Sans, rainbow text, tiled background, hot pink + cyan + yellow.
+// =============================================================================
+
+:root[saved-vibe="geocities"] {
+  --light: #ffff99;
+  --lightgray: #ffccff;
+  --gray: #800080;
+  --darkgray: #000080;
+  --dark: #000000;
+  --secondary: #ff00ff;
+  --tertiary: #00ffff;
+  --highlight: rgba(255, 255, 0, 0.3);
+  --textHighlight: #ffff00cc;
+
+  --headerFont: "Comic Sans MS", "Comic Sans", cursive;
+  --bodyFont: "Comic Sans MS", "Comic Sans", cursive;
+  --codeFont: "Courier New", monospace;
+}
+
+:root[saved-vibe="geocities"] body {
+  background-color: #ffff99;
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      #ffff99 0,
+      #ffff99 20px,
+      #ffccff 20px,
+      #ffccff 40px
+    );
+  color: #000080;
+}
+
+:root[saved-vibe="geocities"] article h1 {
+  text-align: center;
+  font-size: 2.2rem;
+  text-shadow:
+    2px 2px 0 #00ffff,
+    4px 4px 0 #ffff00;
+  animation: geocities-rainbow 3s infinite linear;
+}
+
+:root[saved-vibe="geocities"] article h2 {
+  color: #ff00ff;
+  &::before { content: "🚧 "; }
+  &::after { content: " 🚧"; }
+}
+
+:root[saved-vibe="geocities"] article h3 {
+  color: #008000;
+  font-style: italic;
+  &::before { content: "★ "; }
+  &::after { content: " ★"; }
+}
+
+@keyframes geocities-rainbow {
+  0%, 100% { color: #ff0000; }
+  16%      { color: #ff8800; }
+  33%      { color: #ffff00; }
+  50%      { color: #00ff00; }
+  66%      { color: #0088ff; }
+  83%      { color: #8800ff; }
+}
+
+:root[saved-vibe="geocities"] article a {
+  color: #0000ee;
+  text-decoration: underline;
+  border-bottom: none;
+  font-weight: bold;
+  &:visited { color: #551a8b; }
+  &:hover {
+    color: #ff00ff;
+    background: #ffff00;
+  }
+}
+
+:root[saved-vibe="geocities"] hr {
+  height: 6px;
+  border: none;
+  background: linear-gradient(to right, #ff0000, #ff8800, #ffff00, #00ff00, #0088ff, #8800ff);
+  background-size: 200% 100%;
+  animation: geocities-rainbow-bg 3s linear infinite;
+}
+
+@keyframes geocities-rainbow-bg {
+  0%   { background-position: 0% 0%; }
+  100% { background-position: 200% 0%; }
+}
+
+:root[saved-vibe="geocities"] table {
+  border: 4px ridge #ff00ff;
+}
+:root[saved-vibe="geocities"] th {
+  background: #00ffff !important;
+  color: #800080 !important;
+  border: 2px outset #ffffff;
+  font-family: "Comic Sans MS", cursive;
+}
+:root[saved-vibe="geocities"] td {
+  border: 2px inset #cccccc;
+  background: #ffffcc;
+}
+
+:root[saved-vibe="geocities"] pre {
+  background: #ffffff;
+  border: 3px double #000080;
+  color: #000080;
+}
+
+:root[saved-vibe="geocities"] code {
+  background: #ffff00;
+  color: #ff00ff;
+  padding: 0 0.25em;
+}
+
+:root[saved-vibe="geocities"] blockquote {
+  border: 3px dashed #ff00ff;
+  background: #ffffcc;
+  padding: 0.8rem;
+  &::before {
+    content: "✿ ";
+    color: #ff00ff;
+  }
+  &::after {
+    content: " ✿";
+    color: #ff00ff;
+  }
+}
+
+:root[saved-vibe="geocities"] .page-title {
+  font-family: "Comic Sans MS", cursive;
+  animation: geocities-blink 1.2s infinite step-end;
+  color: #ff00ff;
+  text-shadow: 2px 2px 0 #00ffff;
+}
+
+@keyframes geocities-blink {
+  50% { opacity: 0.5; }
+}
+
+:root[saved-vibe="geocities"] .vibe-btn {
+  background: #ffffcc;
+  border: 2px outset #ff00ff;
+  font-family: "Comic Sans MS", cursive;
+  color: #800080;
+  &.active {
+    background: #ff00ff;
+    color: #ffff00;
+    border-style: inset;
+  }
+}
+
+:root[saved-vibe="geocities"] footer::after {
+  content: "★ Best viewed in Netscape Navigator 4.0 ★ This page is under construction ★";
+  display: block;
+  text-align: center;
+  margin-top: 1rem;
+  font-family: "Comic Sans MS", cursive;
+  animation: geocities-rainbow 4s infinite linear;
+}
+
+// =============================================================================
+// VIBE 3 — Coder (terminal aesthetic)
+// Black background, green text, monospace everywhere, shell-prompt headers.
+// =============================================================================
+
+:root[saved-vibe="coder"] {
+  --light: #0d0d0d;
+  --lightgray: #1a1a1a;
+  --gray: #4a4a4a;
+  --darkgray: #cccccc;
+  --dark: #f0f0f0;
+  --secondary: #00ff66;
+  --tertiary: #ffaa00;
+  --highlight: rgba(0, 255, 102, 0.10);
+  --textHighlight: #00ff6633;
+
+  --headerFont: "JetBrains Mono", "Courier New", monospace;
+  --bodyFont: "JetBrains Mono", "Courier New", monospace;
+  --codeFont: "JetBrains Mono", "Courier New", monospace;
+}
+
+:root[saved-vibe="coder"] body {
+  background-color: #0d0d0d;
+  color: #cccccc;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0,
+      transparent 2px,
+      rgba(0, 255, 102, 0.025) 2px,
+      rgba(0, 255, 102, 0.025) 3px
+    );
+}
+
+:root[saved-vibe="coder"] *,
+:root[saved-vibe="coder"] *::before,
+:root[saved-vibe="coder"] *::after {
+  border-radius: 0 !important;
+}
+
+:root[saved-vibe="coder"] article {
+  h1 {
+    color: #00ff66;
+    border-bottom: 1px dashed #4a4a4a;
+    padding-bottom: 0.3rem;
+    &::before {
+      content: "$ ";
+      color: #ffaa00;
+    }
+    &::after {
+      content: "_";
+      color: #00ff66;
+      animation: coder-cursor 1s infinite step-end;
+    }
+  }
+  h2 {
+    color: #00ff66;
+    &::before {
+      content: "# ";
+      color: #4a4a4a;
+    }
+  }
+  h3 {
+    color: #ffaa00;
+    &::before {
+      content: "├── ";
+      color: #4a4a4a;
+    }
+  }
+
+  a {
+    color: #ffaa00;
+    text-decoration: none;
+    border-bottom: 1px solid #ffaa00;
+    &::before { content: "["; opacity: 0.5; }
+    &::after  { content: "]"; opacity: 0.5; }
+    &:hover {
+      color: #00ff66;
+      border-color: #00ff66;
+      background: rgba(0, 255, 102, 0.10);
+    }
+  }
+}
+
+@keyframes coder-cursor {
+  50% { opacity: 0; }
+}
+
+:root[saved-vibe="coder"] pre {
+  background: #050505;
+  border: 1px solid #1a1a1a;
+  border-left: 2px solid #00ff66;
+  color: #00ff66;
+  padding: 0.9rem 1.1rem !important;
+}
+
+:root[saved-vibe="coder"] code {
+  background: #1a1a1a;
+  color: #00ff66;
+  padding: 0 0.25em;
+}
+
+:root[saved-vibe="coder"] blockquote {
+  border-left: 2px solid #ffaa00;
+  background: rgba(255, 170, 0, 0.05);
+  color: #cccccc;
+  padding: 0.6rem 1rem;
+  font-style: normal;
+  &::before {
+    content: "// ";
+    color: #4a4a4a;
+  }
+}
+
+:root[saved-vibe="coder"] hr {
+  border: none;
+  height: 1px;
+  background: #1a1a1a;
+  margin: 2rem 0;
+  &::after {
+    content: "─────────────────────────────────";
+    display: block;
+    text-align: center;
+    color: #1a1a1a;
+    font-family: var(--codeFont);
+    position: relative;
+    top: -0.7em;
+  }
+}
+
+:root[saved-vibe="coder"] table {
+  border: 1px solid #1a1a1a;
   font-family: var(--codeFont);
   font-size: 0.82rem;
+}
+:root[saved-vibe="coder"] th {
+  background: #1a1a1a;
+  color: #00ff66;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid #2a2a2a;
+}
+:root[saved-vibe="coder"] td {
+  border: 1px solid #1a1a1a;
+  color: #cccccc;
+}
 
-  button.folder-button,
-  & > h1 {
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+:root[saved-vibe="coder"] .page-title {
+  font-family: var(--codeFont);
+  color: #00ff66;
+  &::before {
+    content: "~/ ";
+    color: #ffaa00;
   }
 }
 
-// --- Graph view: keep simple, no rounding ----------------------------------
-.graph-outer {
-  border: 1px solid var(--lightgray);
-}
-
-// --- Backlinks panel --------------------------------------------------------
-.backlinks {
-  border-left: 2px solid var(--secondary);
-  padding-left: 1rem;
-
-  & > h3 {
-    font-family: var(--codeFont);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--gray);
-    font-size: 0.78rem;
+:root[saved-vibe="coder"] .vibe-btn {
+  background: transparent;
+  border: 1px solid #4a4a4a;
+  color: #cccccc;
+  font-family: var(--codeFont);
+  &:hover {
+    color: #00ff66;
+    border-color: #00ff66;
   }
-}
-
-// --- Dark mode tweaks: a little more contrast in panels --------------------
-:root[saved-theme="dark"] {
-  pre {
-    background: #060608;
-    border-color: #2a2a30;
-  }
-
-  code:not(pre code) {
-    background: #1a1a1f;
+  &.active {
+    background: #00ff66;
+    color: #0d0d0d;
+    border-color: #00ff66;
   }
 }
