@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Pre-commit guardrail: refuse to commit if any staged file contains a
+# forbidden term (e.g., the name of a private project that must stay out
+# of this public repo).
+#
+# The forbidden terms are NOT stored in this repo — they would defeat the
+# point. They live in a local-only file: .git-hooks/.forbidden-terms
+# (gitignored). One pattern per line. The hook is a no-op if the file is
+# missing.
+#
+# See CONTRIBUTING.md for setup.
+
+set -e
+
+TERMS_FILE="$(git rev-parse --show-toplevel)/.git-hooks/.forbidden-terms"
+
+if [ ! -f "$TERMS_FILE" ]; then
+  exit 0
+fi
+
+# Build a single ERE alternation pattern from non-empty, non-comment lines.
+pattern=$(grep -vE '^(\s*#|\s*$)' "$TERMS_FILE" | paste -sd '|' -)
+
+if [ -z "$pattern" ]; then
+  exit 0
+fi
+
+# Word-boundary anchored to avoid false positives from arbitrary base64
+# substrings, hash collisions, or similar non-word noise.
+matches=$(git diff --cached --no-color -U0 | grep -inE "^\+.*\<(${pattern})\>" || true)
+
+if [ -n "$matches" ]; then
+  echo "----------------------------------------------------------"
+  echo "BLOCKED: staged changes contain a forbidden term."
+  echo ""
+  echo "$matches"
+  echo ""
+  echo "Remove the references and try again."
+  echo "See CONTRIBUTING.md for the rationale."
+  echo "----------------------------------------------------------"
+  exit 1
+fi
+
+exit 0
