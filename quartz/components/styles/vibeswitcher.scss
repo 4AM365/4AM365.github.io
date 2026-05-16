@@ -3,39 +3,78 @@
   align-items: center;
   gap: 4px;
   flex-wrap: wrap;
-  margin-bottom: 0.5rem;
-  font-family: var(--codeFont);
-
-  .vibe-label {
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    color: var(--gray);
-    margin-right: 0.25rem;
-  }
+  margin: 0.25rem 0 0.5rem 0;
 
   .vibe-btn {
     font-family: var(--codeFont);
     font-size: 0.7rem;
     text-transform: lowercase;
     letter-spacing: 0.04em;
-    padding: 0.15rem 0.5rem;
+    padding: 0.2rem 0.55rem;
     border: 1px solid var(--gray);
     background: transparent;
     color: var(--gray);
     cursor: pointer;
-    transition: all 0.12s ease;
-    border-radius: 0;
-
-    &:hover {
-      color: var(--secondary);
-      border-color: var(--secondary);
-    }
-
-    &.active {
-      background: var(--secondary);
-      color: var(--light);
-      border-color: var(--secondary);
-    }
+    user-select: none;
+    border-radius: 0 !important;
+    line-height: 1.2;
+    transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
   }
+
+  .vibe-btn:hover {
+    color: var(--secondary);
+    border-color: var(--secondary);
+  }
+
+  .vibe-btn.active {
+    background: var(--secondary) !important;
+    color: var(--light) !important;
+    border-color: var(--secondary) !important;
+  }
+}
+
+// =============================================================================
+// Per-vibe button reskinning — kept in this file (and not in custom.scss) so
+// the cascade is fully contained and .active never gets overridden.
+// =============================================================================
+
+// Geocities — chunky outset/inset 3D buttons in Comic Sans
+:root[saved-vibe="geocities"] .vibe-switcher .vibe-btn {
+  font-family: "Comic Sans MS", "Comic Sans", cursive !important;
+  background: #ffffcc !important;
+  border: 2px outset #ff00ff !important;
+  color: #800080 !important;
+  font-size: 0.78rem;
+  letter-spacing: 0;
+}
+
+:root[saved-vibe="geocities"] .vibe-switcher .vibe-btn:hover {
+  background: #ffff66 !important;
+  color: #ff00ff !important;
+}
+
+:root[saved-vibe="geocities"] .vibe-switcher .vibe-btn.active {
+  background: #ff00ff !important;
+  color: #ffff00 !important;
+  border-style: inset !important;
+  border-color: #ff00ff !important;
+}
+
+// Coder — terminal: dim gray border, green when active
+:root[saved-vibe="coder"] .vibe-switcher .vibe-btn {
+  background: transparent !important;
+  border: 1px solid #4a4a4a !important;
+  color: #cccccc !important;
+  font-family: var(--codeFont) !important;
+}
+
+:root[saved-vibe="coder"] .vibe-switcher .vibe-btn:hover {
+  color: #00ff66 !important;
+  border-color: #00ff66 !important;
+}
+
+:root[saved-vibe="coder"] .vibe-switcher .vibe-btn.active {
+  background: #00ff66 !important;
+  color: #0d0d0d !important;
+  border-color: #00ff66 !important;
 }

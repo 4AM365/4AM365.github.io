@@ -261,18 +261,6 @@
   50% { opacity: 0.5; }
 }
 
-:root[saved-vibe="geocities"] .vibe-btn {
-  background: #ffffcc;
-  border: 2px outset #ff00ff;
-  font-family: "Comic Sans MS", cursive;
-  color: #800080;
-  &.active {
-    background: #ff00ff;
-    color: #ffff00;
-    border-style: inset;
-  }
-}
-
 :root[saved-vibe="geocities"] footer::after {
   content: "★ Best viewed in Netscape Navigator 4.0 ★ This page is under construction ★";
   display: block;
@@ -438,18 +426,3 @@
   }
 }
 
-:root[saved-vibe="coder"] .vibe-btn {
-  background: transparent;
-  border: 1px solid #4a4a4a;
-  color: #cccccc;
-  font-family: var(--codeFont);
-  &:hover {
-    color: #00ff66;
-    border-color: #00ff66;
-  }
-  &.active {
-    background: #00ff66;
-    color: #0d0d0d;
-    border-color: #00ff66;
-  }
-}
