@@ -7,10 +7,9 @@ import { classNames } from "../util/lang"
 const VibeSwitcher: QuartzComponent = ({ displayClass }: QuartzComponentProps) => {
   return (
     <div class={classNames(displayClass, "vibe-switcher")}>
-      <span class="vibe-label">vibe</span>
-      <button class="vibe-btn" data-vibe="jdm" aria-label="JDM vibe">jdm</button>
-      <button class="vibe-btn" data-vibe="geocities" aria-label="Geocities vibe">geocities</button>
-      <button class="vibe-btn" data-vibe="coder" aria-label="Coder vibe">coder</button>
+      <button class="vibe-btn" data-vibe="jdm" type="button" aria-label="JDM vibe">jdm</button>
+      <button class="vibe-btn" data-vibe="geocities" type="button" aria-label="Geocities vibe">geocities</button>
+      <button class="vibe-btn" data-vibe="coder" type="button" aria-label="Coder vibe">coder</button>
     </div>
   )
 }
