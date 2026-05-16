@@ -1,0 +1,13 @@
+.DS_Store
+node_modules
+public
+
+# Local-only — must never be committed (would defeat the pre-commit hook's purpose)
+.git-hooks/.forbidden-terms
+prof
+tsconfig.tsbuildinfo
+.obsidian
+.quartz-cache
+private/
+.replit
+replit.nix
