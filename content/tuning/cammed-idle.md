@@ -64,42 +64,38 @@ limits so the slow integrator can't trap the engine in a low-air state.
 ## Removing every source of variation
 
 A cammed idle has almost no margin, so the real work is making the operating point
-**boring** — eliminating the scheduled disturbances that jolt it. Every load or target
-change that lands while the engine is sitting at a controlled idle is a candidate to
-either *smooth* or *relocate*. The rule:
+**boring** — eliminating the scheduled disturbances that jolt it. In principle a
+disturbance can be handled two ways: smooth it into a **PWM/airflow ramp slow enough
+that it never outruns the idle PID**, or **move it outside the idle region entirely** so
+the step never lands while you're holding a controlled idle.
 
-> [!tip] Two ways to handle a disturbance
-> **Either** add it as a **smooth PWM/airflow ramp that does not outrun the idle PID**
-> — sized conservatively, timed to the load's mechanical engagement, so the PID keeps
-> authority in both directions — **or move it outside the idle region entirely**, so the
-> step never arrives while you're holding a controlled idle.
+> [!tip] The approach taken here: relocate, don't smooth
+> On this build I moved **all three** of the usual offenders — VSS up-idle, A/C
+> compressor, and the coolant fan — **well outside the idle region**, rather than asking
+> the idle controller to absorb them. The most robust way to keep a transient from
+> upsetting idle is to make sure it doesn't happen *at* idle in the first place.
 
-What this looks like for the three usual offenders:
+What that looks like for the three offenders:
 
-- **VSS up-idle (raising the idle target with road speed).** This is the tempting one to
-  *avoid*. A VSS-scheduled target bump injects a **target step** into the controller every
-  time you cross the threshold — exactly the kind of scheduled variable that makes a
-  heat-soak idle wander. The better fix for the low-speed return-to-idle dip it was meant
-  to paper over was **more airflow-PID authority** (raise the PID output / integral
-  ceilings) and a **faster PID update interval** (e.g. 200 ms → ~50 ms), not a target
-  step. Prefer tightening the loop you already have over adding a new scheduled input.
-- **A/C compressor kick-on.** A clutch engages in well under a second (~900 ms on this
-  inline-six), so the airflow correction has to **lead the load** and ramp, not arrive as
-  a late slug of air. EMU's custom correction handles it well *if* the feed-forward is
-  timed to engagement and sized conservatively — the airflow change must trail the load by
-  *less* than the lag of the load's torque effect, or you over-add before the compressor
-  actually bites. Under-correct and let the PID finish.
-- **Coolant fan kick-on.** A radiator fan is a big, abrupt alternator/torque step. The
-  clean move is to **relocate it out of the idle window**: gate engagement on CLT *and*
-  road speed so the fan comes on **while the car is still moving** (e.g. at ~70 °C below a
-  speed threshold) instead of snapping on while you sit at a light. The steady-state
-  airflow compensation for fan load (a fixed airflow adder) is correct and stays — what
-  you remove is the *transient* of it engaging at idle.
+- **VSS up-idle (raising the idle target with road speed).** Rather than scheduling a
+  target **step** at a speed threshold — which itself injects variation into a heat-soak
+  idle every time you cross it — the speed-dependent behavior is kept out of the
+  held-idle window, and the low-speed return-to-idle dip is owned by **airflow-PID
+  authority** (PID output / integral ceilings) and a **faster PID update interval** (e.g.
+  200 ms → ~50 ms). The idle you actually sit at sees no scheduled target jump.
+- **A/C compressor.** The compressor load is kept out of the bare-idle window so the
+  clutch never drops a ~900 ms torque step onto a minimum-airflow idle. The airflow is
+  established *before* the load is allowed to land, so the engine is never discovering the
+  compressor while sitting at the floor.
+- **Coolant fan.** The fan is gated on CLT *and* road speed so it engages **while the car
+  is still moving** (e.g. at ~70 °C below a speed threshold) instead of snapping on while
+  you sit at a light. The steady-state airflow compensation for fan load (a fixed airflow
+  adder) stays; what's removed is the *transient* of it engaging at idle.
 
-The throughline: don't let the idle controller discover a disturbance the moment it
-happens. Anticipate it with a ramped feed-forward the PID can ride, or schedule it to
-occur somewhere other than a held idle. Anything you can take off the idle controller's
-plate is variation it no longer has to chase.
+The throughline: don't make the idle controller discover a disturbance the moment it
+happens. Schedule each load to arrive somewhere other than a held idle — and where a
+transient is unavoidable, ramp it slowly enough that the PID can ride it. Anything you
+take off the idle controller's plate is variation it no longer has to chase.
 
 ## Dig into the notes
 
