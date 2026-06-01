@@ -55,7 +55,14 @@ The machine-smoothed map is tighter in **every** overlapping bin — a clean con
 that the algorithm-smoothed surface runs with less knock-sensor chatter and more
 repeatable combustion than the hand-built one.
 
-![Old hand map vs. new machine-smoothed VE surface](<../old vs new ve1 map for machine ve map smoothing.png>)
+The hand-built VE surface versus the machine-smoothed one — the steps that drove the
+extra combustion variability show up as ridged texture that the smoother removes:
+
+![[old vs new ve1 map for machine ve map smoothing.png]]
+
+The same two maps compared in the logs the CoV metric was computed from:
+
+![[log_comparison for machine ve map smoothing.png]]
 
 ## Dig into the notes
 

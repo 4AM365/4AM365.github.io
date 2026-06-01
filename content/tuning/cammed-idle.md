@@ -61,6 +61,46 @@ step loads (fan, A/C, alternator), and anything that crosses stall margin — ex
 a cammed idle already lives near the floor. Keep integrator limits **below** proportional
 limits so the slow integrator can't trap the engine in a low-air state.
 
+## Removing every source of variation
+
+A cammed idle has almost no margin, so the real work is making the operating point
+**boring** — eliminating the scheduled disturbances that jolt it. Every load or target
+change that lands while the engine is sitting at a controlled idle is a candidate to
+either *smooth* or *relocate*. The rule:
+
+> [!tip] Two ways to handle a disturbance
+> **Either** add it as a **smooth PWM/airflow ramp that does not outrun the idle PID**
+> — sized conservatively, timed to the load's mechanical engagement, so the PID keeps
+> authority in both directions — **or move it outside the idle region entirely**, so the
+> step never arrives while you're holding a controlled idle.
+
+What this looks like for the three usual offenders:
+
+- **VSS up-idle (raising the idle target with road speed).** This is the tempting one to
+  *avoid*. A VSS-scheduled target bump injects a **target step** into the controller every
+  time you cross the threshold — exactly the kind of scheduled variable that makes a
+  heat-soak idle wander. The better fix for the low-speed return-to-idle dip it was meant
+  to paper over was **more airflow-PID authority** (raise the PID output / integral
+  ceilings) and a **faster PID update interval** (e.g. 200 ms → ~50 ms), not a target
+  step. Prefer tightening the loop you already have over adding a new scheduled input.
+- **A/C compressor kick-on.** A clutch engages in well under a second (~900 ms on this
+  inline-six), so the airflow correction has to **lead the load** and ramp, not arrive as
+  a late slug of air. EMU's custom correction handles it well *if* the feed-forward is
+  timed to engagement and sized conservatively — the airflow change must trail the load by
+  *less* than the lag of the load's torque effect, or you over-add before the compressor
+  actually bites. Under-correct and let the PID finish.
+- **Coolant fan kick-on.** A radiator fan is a big, abrupt alternator/torque step. The
+  clean move is to **relocate it out of the idle window**: gate engagement on CLT *and*
+  road speed so the fan comes on **while the car is still moving** (e.g. at ~70 °C below a
+  speed threshold) instead of snapping on while you sit at a light. The steady-state
+  airflow compensation for fan load (a fixed airflow adder) is correct and stays — what
+  you remove is the *transient* of it engaging at idle.
+
+The throughline: don't let the idle controller discover a disturbance the moment it
+happens. Anticipate it with a ramped feed-forward the PID can ride, or schedule it to
+occur somewhere other than a held idle. Anything you can take off the idle controller's
+plate is variation it no longer has to chase.
+
 ## Dig into the notes
 
 - [notes/idle_stall.md](https://github.com/4AM365/emu-black-tuning-notes/blob/master/notes/idle_stall.md) — the full stall-pattern troubleshooting tree and the conservative feed-forward principle
