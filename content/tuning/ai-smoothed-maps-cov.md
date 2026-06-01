@@ -34,6 +34,16 @@ The same idea applies to the ignition surface (e.g. flattening the cruise platea
 to the VE/fuel-dose table. The on-site skill packages it so you can hand a map to an AI
 and get a clean surface back.
 
+> [!tip] Paste the autotuned map straight into the chat
+> You don't need to attach a tune file or do any setup. **Copy the autotuned table out
+> of EMU, paste the grid into the chat, and ask for it smoothed** — the assistant reads
+> the grid, treats the cells the autotune moved as anchors (or you point them out once),
+> applies the anchor-weighted polynomial smooth automatically, and hands back the cleaned
+> grid in the same shape plus a move report. Paste a hit-count/weight grid alongside it
+> and anchor detection is fully automatic. When it looks right it'll offer the importable
+> `.emubt`. The smoothing engine is identical to the file workflow — only the input
+> changes.
+
 ## The proof: smoother maps burn tighter
 
 I read **combustion stability from knock-sensor "chatter."** On no-knock cycles, the
