@@ -83,10 +83,12 @@ What that looks like for the three offenders:
   held-idle window, and the low-speed return-to-idle dip is owned by **airflow-PID
   authority** (PID output / integral ceilings) and a **faster PID update interval** (e.g.
   200 ms → ~50 ms). The idle you actually sit at sees no scheduled target jump.
-- **A/C compressor.** The compressor load is kept out of the bare-idle window so the
-  clutch never drops a ~900 ms torque step onto a minimum-airflow idle. The airflow is
-  established *before* the load is allowed to land, so the engine is never discovering the
-  compressor while sitting at the floor.
+- **A/C compressor.** The simplest possible fix: raise the **minimum A/C activation
+  RPM** above the idle band so the clutch physically cannot engage while you're sitting
+  at idle. The ~900 ms torque step never lands on a minimum-airflow idle because the
+  compressor only comes on once the engine is already off idle and breathing. No idle-up
+  schedule, no feed-forward to time — the disturbance is simply gated out of the window.
+  Works just fine.
 - **Coolant fan.** The fan is gated on CLT *and* road speed so it engages **while the car
   is still moving** (e.g. at ~70 °C below a speed threshold) instead of snapping on while
   you sit at a light. The steady-state airflow compensation for fan load (a fixed airflow
