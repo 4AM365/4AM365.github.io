@@ -1,7 +1,9 @@
 ---
 title: OBD smart boost controller
-tags: [code, cars, electronics]
+tags: [code, cars, electronics, half-baked-idea]
 ---
+
+*Half-baked idea — not yet built out.*
 
 OBD-driven smart boost controller — reads live vehicle data over OBD to inform boost-target logic.
 

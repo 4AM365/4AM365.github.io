@@ -1,7 +1,9 @@
 ---
 title: AI / ML education notes
-tags: [ml, ai, learning, reference]
+tags: [ml, ai, learning, reference, half-baked-idea]
 ---
+
+*Half-baked idea — not yet built out.*
 
 Cheatsheets, flashcards, and study notes for ML/AI.
 
