@@ -1,5 +1,5 @@
 ---
-title: EMU Black AI tuning skills
+title: AI tuning skills
 tags: [tuning, ecu, ai, skills]
 description: Copy-paste prompt blocks that turn Claude or ChatGPT into an EMU Black tuning assistant.
 ---
