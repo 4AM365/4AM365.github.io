@@ -9,7 +9,6 @@ const VibeSwitcher: QuartzComponent = ({ displayClass }: QuartzComponentProps) =
     <div class={classNames(displayClass, "vibe-switcher")}>
       <button class="vibe-btn" data-vibe="jdm" type="button" aria-label="JDM vibe">jdm</button>
       <button class="vibe-btn" data-vibe="geocities" type="button" aria-label="Geocities vibe">geocities</button>
-      <button class="vibe-btn" data-vibe="coder" type="button" aria-label="Coder vibe">coder</button>
     </div>
   )
 }

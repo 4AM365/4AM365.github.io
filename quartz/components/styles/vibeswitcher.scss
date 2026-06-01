@@ -42,39 +42,20 @@
 :root[saved-vibe="geocities"] .vibe-switcher .vibe-btn {
   font-family: "Comic Sans MS", "Comic Sans", cursive !important;
   background: #ffffcc !important;
-  border: 2px outset #ff00ff !important;
-  color: #800080 !important;
+  border: 2px outset #cc00cc !important;
+  color: #5a005a !important;
   font-size: 0.78rem;
   letter-spacing: 0;
 }
 
 :root[saved-vibe="geocities"] .vibe-switcher .vibe-btn:hover {
   background: #ffff66 !important;
-  color: #ff00ff !important;
+  color: #800080 !important;
 }
 
 :root[saved-vibe="geocities"] .vibe-switcher .vibe-btn.active {
-  background: #ff00ff !important;
-  color: #ffff00 !important;
+  background: #cc00cc !important;
+  color: #ffffff !important;
   border-style: inset !important;
-  border-color: #ff00ff !important;
-}
-
-// Coder — terminal: dim gray border, green when active
-:root[saved-vibe="coder"] .vibe-switcher .vibe-btn {
-  background: transparent !important;
-  border: 1px solid #4a4a4a !important;
-  color: #cccccc !important;
-  font-family: var(--codeFont) !important;
-}
-
-:root[saved-vibe="coder"] .vibe-switcher .vibe-btn:hover {
-  color: #00ff66 !important;
-  border-color: #00ff66 !important;
-}
-
-:root[saved-vibe="coder"] .vibe-switcher .vibe-btn.active {
-  background: #00ff66 !important;
-  color: #0d0d0d !important;
-  border-color: #00ff66 !important;
+  border-color: #cc00cc !important;
 }
