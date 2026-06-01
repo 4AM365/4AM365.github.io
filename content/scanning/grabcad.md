@@ -3,4 +3,4 @@ title: GrabCAD contributions
 tags: [scanning, open-source, cars]
 ---
 
-[GrabCAD library](https://grabcad.com/library) — automotive parts and reference geometry.
+[grabcad.com/4am_engineering-1](https://grabcad.com/4am_engineering-1) — automotive parts and reference geometry.
