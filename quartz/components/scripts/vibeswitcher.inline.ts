@@ -1,4 +1,4 @@
-const VIBES = ["jdm", "geocities", "coder"]
+const VIBES = ["jdm", "geocities"]
 const DEFAULT_VIBE = "jdm"
 
 const readVibe = (): string => {
