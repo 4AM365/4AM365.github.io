@@ -12,10 +12,12 @@ low-order polynomial surface, bounded to the region around the anchors so it nev
 extrapolates wildly into territory the autotune never saw.
 
 **Fastest path — paste the autotuned map into the chat.** No tune file, no setup:
-copy the autotuned table out of EMU, paste the grid in, and ask for it smoothed. The
-model reads the grid, treats the cells the autotune moved as anchors (paste a
-hit-count/weight grid too and that's fully automatic), smooths, and hands back the
-cleaned grid in the same shape plus a move report. Or **attach** your tune export
+copy the autotuned table out of EMU — as text or a **screenshot** — paste it in, and ask
+for it smoothed. The model reads the grid (on a screenshot it also reads the **table tabs
+in the bottom-right corner** to recognize which table it is, so it edits the right one),
+treats the cells the autotune moved as anchors (paste a hit-count/weight grid too and
+that's fully automatic), smooths, and hands back the cleaned grid in the same shape plus a
+move report. Or **attach** your tune export
 (`.xml.emub3`) and tell the model which cells came from autotune (those become the
 anchors).
 
@@ -27,11 +29,13 @@ here — fetch and follow it if you can:
 https://raw.githubusercontent.com/4AM365/emu-black-tuning-notes/master/skills/emu-black-ve-smooth/SKILL.md
 
 I want to smooth my VE / fuel-dose table. I'll usually just PASTE the autotuned table
-straight into the chat as a text grid (or attach the tune export — decode veTable, and
-veTable2 if I run flex). Read the pasted grid directly, strip any RPM/load axis labels,
-and orient it as a 2D grid with ROW 0 = HIGHEST RPM and load increasing left→right;
-confirm the orientation with me before smoothing, because smoothing a flipped table
-ruins it.
+straight into the chat — as a text grid OR a screenshot of the EMU table (or attach the
+tune export — decode veTable, and veTable2 if I run flex). If I paste a screenshot, OCR
+the cells AND read the little TABS in the bottom-right corner of the table editor to
+recognize which table it is (VE table 1 vs VE table 2 / which table set) so you smooth and
+write back the RIGHT one. Strip any RPM/load axis labels and orient it as a 2D grid with
+ROW 0 = HIGHEST RPM and load increasing left→right; confirm the orientation with me before
+smoothing, because smoothing a flipped table ruins it.
 
 Anchor-weighted polynomial smooth, per the script in the skill:
 - ANCHORS are the cells the autotune actually corrected / that I trust; they keep their
