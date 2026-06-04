@@ -36,13 +36,15 @@ and get a clean surface back.
 
 > [!tip] Paste the autotuned map straight into the chat
 > You don't need to attach a tune file or do any setup. **Copy the autotuned table out
-> of EMU, paste the grid into the chat, and ask for it smoothed** — the assistant reads
-> the grid, treats the cells the autotune moved as anchors (or you point them out once),
-> applies the anchor-weighted polynomial smooth automatically, and hands back the cleaned
-> grid in the same shape plus a move report. Paste a hit-count/weight grid alongside it
-> and anchor detection is fully automatic. When it looks right it'll offer the importable
-> `.emubt`. The smoothing engine is identical to the file workflow — only the input
-> changes.
+> of EMU — as text or even just a screenshot — paste it into the chat, and ask for it
+> smoothed.** The assistant reads the grid (and, on a screenshot, reads the little
+> **table tabs in the bottom-right corner** to recognize *which* table it is — VE table 1
+> vs VE table 2 / which set — so it edits the right one), treats the cells the autotune
+> moved as anchors (or you point them out once), applies the anchor-weighted polynomial
+> smooth automatically, and hands back the cleaned grid in the same shape plus a move
+> report. Paste a hit-count/weight grid alongside it and anchor detection is fully
+> automatic. When it looks right it'll offer the importable `.emubt`. The smoothing engine
+> is identical to the file workflow — only the input changes.
 
 ## The proof: smoother maps burn tighter
 
