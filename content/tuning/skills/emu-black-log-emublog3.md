@@ -1,7 +1,5 @@
 ---
 title: Parse a binary .emublog3 log
-tags: [tuning, ecu, ai, skills]
-description: Read EMU Black's binary log format directly, skipping the CSV export step.
 ---
 
 EMU Black stores binary data logs as `.emublog3` — a gzip-compressed record stream

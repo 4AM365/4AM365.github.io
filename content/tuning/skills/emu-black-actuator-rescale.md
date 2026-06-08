@@ -1,7 +1,5 @@
 ---
 title: Rescale airflow for a new DBW range
-tags: [tuning, ecu, ai, skills]
-description: Move the idle throttle floor/ceiling without changing how the engine idles.
 ---
 
 On a drive-by-wire EMU Black setup, every airflow-% target is mapped into an actual

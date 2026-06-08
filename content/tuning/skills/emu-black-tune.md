@@ -1,7 +1,5 @@
 ---
 title: Read & edit an EMU Black tune file
-tags: [tuning, ecu, ai, skills]
-description: Decode symbols, tables and scaling in an EMU Black XML tune export — and change values safely.
 ---
 
 EMU Black stores a tune as an XML project export (`*.xml.emub3`). The raw integers

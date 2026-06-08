@@ -1,7 +1,5 @@
 ---
 title: DBW thermal expansion at extreme charge temps
-tags: [tuning, dbw, idle, airflow, thermal]
-description: Why a hot throttle body leaks more air at idle — and how to compensate the airflow target as a temperature-indexed correction instead of fighting it with the PID.
 ---
 
 > [!abstract] The discovery

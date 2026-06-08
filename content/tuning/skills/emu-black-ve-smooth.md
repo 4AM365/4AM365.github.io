@@ -1,7 +1,5 @@
 ---
 title: Smooth a VE / fuel map
-tags: [tuning, ecu, ai, skills]
-description: Clean the steps out of an autotuned VE table while keeping the trusted cells pinned.
 ---
 
 A log-based autotune only corrects the cells the car actually visited, so the VE /

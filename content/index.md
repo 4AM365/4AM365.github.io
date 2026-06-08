@@ -1,6 +1,5 @@
 ---
 title: FAMES
-description: Four AM Engineering Service.
 ---
 
 # FAMES
@@ -18,5 +17,4 @@ description: Four AM Engineering Service.
 - [Making](making/)
 - [Kitchen](kitchen/)
 - [Notes](notes/)
-- [[principles]]
 - [[about]]

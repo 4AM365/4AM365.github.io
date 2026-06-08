@@ -1,7 +1,5 @@
 ---
 title: Protecting & perfecting a cammed idle
-tags: [tuning, idle, dbw, stall, cams]
-description: Why big-cam engines stall, how the EMU idle control architecture is meant to work, and the principles that make a cammed idle stable.
 ---
 
 > [!abstract] The discovery

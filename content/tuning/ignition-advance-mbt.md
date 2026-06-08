@@ -1,7 +1,5 @@
 ---
 title: Dialing MBT ignition by cam, fuel & load
-tags: [tuning, ignition, mbt, flex-fuel, vvt]
-description: Finding and safely approaching MBT in every region of the map, accounting for cam overlap, fuel, and operating point.
 ---
 
 > [!abstract] The discovery

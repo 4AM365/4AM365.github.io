@@ -1,7 +1,5 @@
 ---
 title: AI-smoothed fuel & ignition maps to cut CoV
-tags: [tuning, ai, ve, smoothing, combustion, cov]
-description: Using AI to produce perfectly smooth fuel and ignition surfaces — and the proof, from knock-sensor scatter, that smoother maps burn more repeatably.
 ---
 
 > [!abstract] The discovery

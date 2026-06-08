@@ -1,7 +1,5 @@
 ---
 title: Street-tune VVT-i cams
-tags: [tuning, ecu, ai, skills]
-description: Find the best intake cam advance without a dyno, using MAP-at-fixed-TPS as a torque proxy.
 ---
 
 A dyno gives direct torque feedback; on the street you use proxies. This skill is the
