@@ -125,7 +125,8 @@
 // Comic Sans, rainbow text, tiled background, hot pink + cyan + yellow.
 // =============================================================================
 
-:root[saved-vibe="geocities"] {
+:root[saved-vibe="geocities"],
+:root[saved-theme="dark"][saved-vibe="geocities"] {
   --light: #ffff99;
   --lightgray: #ffe6ff;
   --gray: #5a005a;
