@@ -125,8 +125,7 @@
 // Comic Sans, rainbow text, tiled background, hot pink + cyan + yellow.
 // =============================================================================
 
-:root[saved-vibe="geocities"],
-:root[saved-theme="dark"][saved-vibe="geocities"] {
+:root[saved-vibe="geocities"] {
   --light: #ffff99;
   --lightgray: #ffe6ff;
   --gray: #5a005a;
@@ -140,6 +139,20 @@
   --headerFont: "Comic Sans MS", "Comic Sans", cursive;
   --bodyFont: "Comic Sans MS", "Comic Sans", cursive;
   --codeFont: "Courier New", monospace;
+}
+
+// Dark geocities: midnight-BBS palette. Inverts the surfaces but keeps
+// the neon/magenta/cyan accent vocabulary intact.
+:root[saved-theme="dark"][saved-vibe="geocities"] {
+  --light: #1a0033;
+  --lightgray: #2a0044;
+  --gray: #b18cff;
+  --darkgray: #f0e6ff;
+  --dark: #f0e6ff;
+  --secondary: #ff66ff;
+  --tertiary: #00ffff;
+  --highlight: rgba(255, 0, 255, 0.18);
+  --textHighlight: #ff00ff66;
 }
 
 :root[saved-vibe="geocities"] body {
@@ -272,6 +285,95 @@
   margin-top: 1rem;
   font-family: "Comic Sans MS", cursive;
   animation: geocities-rainbow 4s infinite linear;
+}
+
+// -----------------------------------------------------------------------------
+// Dark geocities — surface + accent overrides on top of the light geocities
+// rules. Inverts hardcoded backgrounds and re-tunes accents that washed out
+// (h3 olive-green, link navy, blockquote/code navy) against the dark tile.
+// -----------------------------------------------------------------------------
+:root[saved-theme="dark"][saved-vibe="geocities"] body {
+  background-color: #1a0033;
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      #1a0033 0,
+      #1a0033 22px,
+      #2a0044 22px,
+      #2a0044 44px
+    );
+  color: #f0e6ff;
+}
+
+:root[saved-theme="dark"][saved-vibe="geocities"] article h2 {
+  color: #ff66ff;
+}
+
+:root[saved-theme="dark"][saved-vibe="geocities"] article h3 {
+  color: #66ff66;
+}
+
+:root[saved-theme="dark"][saved-vibe="geocities"] article a {
+  color: #66ccff;
+  &:visited { color: #ff99ff; }
+  &:hover {
+    color: #1a0033;
+    background: #ffff66;
+  }
+}
+
+@keyframes geocities-rainbow-dark {
+  0%, 100% { color: #ff6666; }
+  16%      { color: #ffaa66; }
+  33%      { color: #ffff66; }
+  50%      { color: #66ff66; }
+  66%      { color: #66ccff; }
+  83%      { color: #cc99ff; }
+}
+
+:root[saved-theme="dark"][saved-vibe="geocities"] article h1 {
+  animation: geocities-rainbow-dark 3s infinite linear;
+  text-shadow:
+    2px 2px 0 #ff00ff,
+    4px 4px 0 #00ffff;
+}
+
+:root[saved-theme="dark"][saved-vibe="geocities"] footer::after {
+  animation: geocities-rainbow-dark 4s infinite linear;
+}
+
+:root[saved-theme="dark"][saved-vibe="geocities"] th {
+  background: #ff00ff !important;
+  color: #1a0033 !important;
+  border: 2px outset #ff66ff;
+}
+
+:root[saved-theme="dark"][saved-vibe="geocities"] td {
+  background: #2a0044;
+  color: #f0e6ff;
+  border: 2px inset #5a3380;
+}
+
+:root[saved-theme="dark"][saved-vibe="geocities"] pre {
+  background: #0d001a;
+  border: 3px double #ff66ff;
+  color: #ffff99;
+}
+
+:root[saved-theme="dark"][saved-vibe="geocities"] code {
+  background: #ffff66;
+  color: #1a0033;
+}
+
+:root[saved-theme="dark"][saved-vibe="geocities"] blockquote {
+  background: #2a0044;
+  border: 3px dashed #00ffff;
+  color: #f0e6ff;
+}
+
+:root[saved-theme="dark"][saved-vibe="geocities"] .page-title {
+  color: #00ffff;
+  text-shadow: 2px 2px 0 #ff00ff;
 }
 
 // =============================================================================
