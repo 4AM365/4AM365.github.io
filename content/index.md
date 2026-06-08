@@ -6,8 +6,6 @@ title: FAMES
 
 *Four AM Engineering Service.*
 
-## Sections
-
 - [Tuning](tuning/)
 - [Cars](cars/)
 - [3D Scanning](scanning/)

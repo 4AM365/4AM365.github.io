@@ -2,7 +2,7 @@
 title: DBW thermal expansion at extreme charge temps
 ---
 
-> [!abstract] The discovery
+> [!abstract]
 > At idle a drive-by-wire throttle sits nearly closed, and the only flow path is the
 > thin clearance around the plate edge. The bore (aluminum) and the plate (stainless or
 > nickel-silver) **expand at different rates**, so that clearance *grows as the assembly
@@ -28,7 +28,7 @@ temperature-varying leak). For a 73 mm bore the diametral clearance grows ~16 µ
 ΔT 50 °C, ~26 µm at ΔT 80 °C. Because idle flow is choked, **mass flow is proportional
 to that area** — so the leak scales directly with the clearance growth.
 
-## Why it's RPM-dependent (the elegant part)
+## Why it's RPM-dependent
 
 The same fixed clearance growth is a **larger fraction** of a smaller opening. At lower
 idle-target RPM the airflow command is smaller, the plate angle is smaller, and the

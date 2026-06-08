@@ -2,12 +2,11 @@
 title: Structuring 3D per-cylinder trims
 ---
 
-> [!abstract] The discovery
+> [!abstract]
 > A front-feed intake manifold doesn't fuel every cylinder equally — air-mass inertia
 > carries mixture past the front runners and the rear cylinders run lean. The fix isn't
 > a single global number; it's a set of **3D trim tables shaped across load**, anchored
-> to EGT, and (the satisfying part) confirmed by the knock sensor going *quiet* once the
-> cylinders are matched.
+> to EGT, and confirmed by the knock sensor going *quiet* once the cylinders are matched.
 
 ## The distribution model
 
@@ -39,7 +38,7 @@ safety. A validated on-car result landed near cyl1/2 at 0%, cyl3 ~+2%, cyl6 ~+9%
 tables share one load shape. The next step is always *measure more cylinders* (an
 EGT-to-CAN module) before trusting an extrapolated trim.
 
-## The validation nobody expects
+## Knock-baseline validation
 
 After the trims went in, the **knock-sensor baseline went dead smooth at full boost —
 even with more timing.** There were never knock *spikes*; what changed was that the

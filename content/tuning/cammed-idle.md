@@ -2,7 +2,7 @@
 title: Protecting & perfecting a cammed idle
 ---
 
-> [!abstract] The discovery
+> [!abstract]
 > A cammed idle is marginal by nature — high overlap means a heavily diluted, residual-
 > rich charge that burns slowly and unevenly. Stability comes from getting the
 > **architecture** right: airflow owns RPM, ignition is a fast trim, feed-forward is
@@ -43,7 +43,7 @@ The notes catalog the stall patterns; nearly every one is a specific, logged cau
 - **Hunt-then-stall:** noisy VVT-i or CLT — three feedback loops fighting. Lock those
   down before touching calibration.
 
-## The principle that ties it together
+## Conservative feed-forward
 
 **Feed-forward should be conservative; the PID does the rest.** Bias open-loop
 corrections toward *under*-correction — apply roughly half the airflow change the engine
@@ -67,7 +67,7 @@ disturbance can be handled two ways: smooth it into a **PWM/airflow ramp slow en
 that it never outruns the idle PID**, or **move it outside the idle region entirely** so
 the step never lands while you're holding a controlled idle.
 
-> [!tip] The approach taken here: relocate, don't smooth
+> [!tip] Relocate, don't smooth
 > On this build I moved **all three** of the usual offenders — VSS up-idle, A/C
 > compressor, and the coolant fan — **well outside the idle region**, rather than asking
 > the idle controller to absorb them. The most robust way to keep a transient from
