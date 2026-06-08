@@ -16,6 +16,7 @@ description: Four AM Engineering Service.
 - [Code](code/)
 - [Forensics](forensics/)
 - [Making](making/)
+- [Kitchen](kitchen/)
 - [Notes](notes/)
 - [[principles]]
 - [[about]]
