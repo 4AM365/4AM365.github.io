@@ -2,10 +2,7 @@
 title: Tuning
 ---
 
-Themes from tuning an ECUMaster EMU Black on a flex-fuel, cammed, drive-by-wire turbo
-build — each a high-level view of an idea that pushed the tune to a new level, with the
-full first-principles work and data in the
-[tuning notes repo](https://github.com/4AM365/emu-black-tuning-notes).
+Tuning an ECUMaster EMU Black on a flex-fuel, cammed, drive-by-wire turbo build. Underlying notes and data: [tuning notes repo](https://github.com/4AM365/emu-black-tuning-notes).
 
 - [[ignition-advance-mbt|Dialing MBT ignition by cam, fuel & load]]
 - [[ai-smoothed-maps-cov|AI-smoothed fuel & ignition maps to cut CoV]]

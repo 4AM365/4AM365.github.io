@@ -2,7 +2,7 @@
 title: AI-smoothed fuel & ignition maps to cut CoV
 ---
 
-> [!abstract] The discovery
+> [!abstract]
 > A log-based autotune only corrects the cells you actually drove through, leaving the
 > map full of steps. Those steps don't just look ugly — they raise the **cycle-to-cycle
 > variability of combustion** every time you interpolate across them. Smoothing the map
@@ -44,7 +44,7 @@ and get a clean surface back.
 > automatic. When it looks right it'll offer the importable `.emubt`. The smoothing engine
 > is identical to the file workflow — only the input changes.
 
-## The proof: smoother maps burn tighter
+## Results
 
 I read **combustion stability from knock-sensor "chatter."** On no-knock cycles, the
 cycle-to-cycle scatter of the per-event knock-band energy proxies CoV — but only after

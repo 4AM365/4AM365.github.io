@@ -2,7 +2,7 @@
 title: Dialing MBT ignition by cam, fuel & load
 ---
 
-> [!abstract] The discovery
+> [!abstract]
 > The "right" ignition advance is not one number, or even one curve — it's a surface
 > that bends with **cam overlap, fuel chemistry, and the local operating point.** Once
 > you understand *why* MBT moves where it does, you can place timing deliberately in
@@ -47,7 +47,7 @@ Three levers move MBT, and they interact:
   first 50% ethanol). **You tune timing by moving the Table 2 values, never by bending
   the blend curve** — the blend just multiplies your delta.
 
-## The VVT coupling that catches people
+## VVT coupling
 
 Cam advance and the ignition table are **coupled**. Moving the cam changes residual
 fraction and effective compression, which moves MBT at that cell — so any time you

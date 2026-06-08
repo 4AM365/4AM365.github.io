@@ -1,21 +1,22 @@
 # FAMES — Four AM Engineering Service
 
-Public notes and writing by William Craig. Published at [4am365.github.io](https://4am365.github.io). Built on [Quartz v4](https://quartz.jzhao.xyz/).
-
-## What this repo is
-
-A digital garden — interconnected markdown notes published as a static site. Everything substantive lives in [`content/`](content/) as plain `.md` files. The four guiding principles are in [content/principles.md](content/principles.md).
+Notes by William Craig. Published at [4am365.github.io](https://4am365.github.io). Built on [Quartz v4](https://quartz.jzhao.xyz/).
 
 ## Layout
 
 ```
-content/                  # all written material — read this
-├── index.md              # landing page
-├── principles.md         # why this site exists in this shape
-├── about.md              # who, what, how
-├── projects/             # things I'm building
-└── notes/                # ongoing learning
-quartz/                   # static-site generator (don't edit unless customizing)
+content/                  # markdown source
+├── index.md              # landing
+├── about.md              # bio
+├── tuning/               # EMU Black tuning
+├── cars/                 # build pages
+├── code/                 # software projects
+├── forensics/            # forensic engineering
+├── making/               # hardware projects
+├── scanning/             # 3D scanning
+├── kitchen/              # recipes / calculators
+└── notes/                # other notes
+quartz/                   # static-site generator
 quartz.config.ts          # site title, baseUrl, plugins
 quartz.layout.ts          # header/footer/sidebar
 .github/workflows/        # auto-deploy to GitHub Pages
