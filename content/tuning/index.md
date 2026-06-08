@@ -1,7 +1,5 @@
 ---
 title: Tuning
-tags: [tuning, ecu]
-description: Major themes from tuning an ECUMaster EMU Black on a flex-fuel, cammed, drive-by-wire turbo build.
 ---
 
 Themes from tuning an ECUMaster EMU Black on a flex-fuel, cammed, drive-by-wire turbo

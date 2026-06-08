@@ -1,6 +1,5 @@
 ---
 title: MKIV Supra
-tags: [cars, build]
 ---
 
 | System | Spec                                       |

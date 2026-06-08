@@ -1,6 +1,5 @@
 ---
 title: Focaccia Calculator
-tags: [tools, kitchen, baking]
 ---
 
 A baker's-percentage build sheet for high-hydration focaccia — punch in your

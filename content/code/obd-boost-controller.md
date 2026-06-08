@@ -1,6 +1,5 @@
 ---
 title: OBD smart boost controller
-tags: [code, cars, electronics, half-baked-idea]
 ---
 
 *Half-baked idea — not yet built out.*

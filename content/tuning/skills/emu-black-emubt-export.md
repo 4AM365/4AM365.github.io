@@ -1,7 +1,5 @@
 ---
 title: Export a table as .emubt
-tags: [tuning, ecu, ai, skills, tools]
-description: Turn computed table values into a single-table file EMU Black can import.
 ---
 
 `.emubt` is EMU Black's single-table import format. Writing one by hand has a few

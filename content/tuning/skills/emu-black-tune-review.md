@@ -1,7 +1,5 @@
 ---
 title: Audit a whole tune
-tags: [tuning, ecu, ai, skills]
-description: Best-practice review across idle, fuel, ignition and boost — with citations.
 ---
 
 A full-tune sanity check against the practitioner and academic literature (Banish,

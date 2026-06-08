@@ -1,7 +1,5 @@
 ---
 title: Diagnose an EMU Black data log
-tags: [tuning, ecu, ai, skills]
-description: Find why it stalled, ran lean, lost boost or knocked — from a CSV data log.
 ---
 
 EMU Black exports data logs as semicolon-delimited CSV with a `TIME` column and a few

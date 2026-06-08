@@ -1,7 +1,5 @@
 ---
 title: Structuring 3D per-cylinder trims
-tags: [tuning, fueling, per-cylinder, ffim, egt]
-description: How to build per-cylinder fuel trim tables that correct intake-manifold maldistribution — load-shaped, EGT-anchored, and validated by knock-sensor smoothness.
 ---
 
 > [!abstract] The discovery

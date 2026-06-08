@@ -1,6 +1,5 @@
 ---
 title: FCM image converter
-tags: [forensics, tools, cv]
 ---
 
 `.pgm` processing for pre-crash images (forward-collision-mitigation camera data).

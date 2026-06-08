@@ -1,6 +1,5 @@
 ---
 title: Datsun 510 — hillclimb build
-tags: [cars, electrical, motorsport]
 ---
 
 Mike's hillclimb 510. Full chassis electrical system designed and wired from scratch.
