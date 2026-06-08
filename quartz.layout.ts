@@ -5,7 +5,7 @@ import * as Component from "./quartz/components"
 export const sharedPageComponents: SharedLayout = {
   head: Component.Head(),
   header: [Component.Darkmode()],
-  afterBody: [],
+  afterBody: [Component.WidgetLoader()],
   footer: Component.Footer({
     links: {
       GitHub: "https://github.com/4AM365",
