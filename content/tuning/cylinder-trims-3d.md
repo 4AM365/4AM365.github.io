@@ -55,7 +55,7 @@ appears.
 > over-enriched to protect the lean cylinder — that's what the trims are for. Enriching
 > globally just drowns the cylinders that were already fine.
 
-## Dig into the notes
+## Notes
 
 - [notes/per_cylinder_trim_ffim_distribution.md](https://github.com/4AM365/emu-black-tuning-notes/blob/master/notes/per_cylinder_trim_ffim_distribution.md) — the table structure, distribution model, load shape, and the validated trim profile
 - [notes/knock_sensor_baseline_vs_cylinder_uniformity.md](https://github.com/4AM365/emu-black-tuning-notes/blob/master/notes/knock_sensor_baseline_vs_cylinder_uniformity.md) — why matched AFR flattens the knock-sensor baseline
