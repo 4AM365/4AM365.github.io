@@ -97,7 +97,7 @@ happens. Schedule each load to arrive somewhere other than a held idle — and w
 transient is unavoidable, ramp it slowly enough that the PID can ride it. Anything you
 take off the idle controller's plate is variation it no longer has to chase.
 
-## Dig into the notes
+## Notes
 
 - [notes/idle_stall.md](https://github.com/4AM365/emu-black-tuning-notes/blob/master/notes/idle_stall.md) — the full stall-pattern troubleshooting tree and the conservative feed-forward principle
 - [notes/cranking_and_idle.md](https://github.com/4AM365/emu-black-tuning-notes/blob/master/notes/cranking_and_idle.md) — cranking/idle architecture, actuator range setup, idle ignition reserve, ASE, long-cam strategy

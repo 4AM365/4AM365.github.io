@@ -74,7 +74,7 @@ The same two maps compared in the logs the CoV metric was computed from:
 
 ![[log_comparison for machine ve map smoothing.png]]
 
-## Dig into the notes
+## Notes
 
 - [notes/knock_voltage_cov_combustion_stability.md](https://github.com/4AM365/emu-black-tuning-notes/blob/master/notes/knock_voltage_cov_combustion_stability.md) — the CoV-from-knock-scatter method, the two traps, and the full result
 - [notes/ve_correctness_from_log_method.md](https://github.com/4AM365/emu-black-tuning-notes/blob/master/notes/ve_correctness_from_log_method.md) — how to derive the corrections (the anchors) from a log: STFT in steady cells, lambda error in accel cells, coverage everywhere

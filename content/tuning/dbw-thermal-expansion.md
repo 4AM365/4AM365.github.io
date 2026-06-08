@@ -59,7 +59,7 @@ floor.
 - Removing the hood dropped intake charge temp ~5–8 °C at idle but **didn't** change the
   manifold conduction soak — context for how much CAT swing to design around.
 
-## Dig into the notes
+## Notes
 
 - [notes/throttle_body_thermal_growth.md](https://github.com/4AM365/emu-black-tuning-notes/blob/master/notes/throttle_body_thermal_growth.md) — full butterfly-flow + differential-expansion derivation, per-RPM tables, physics-pure reference correction
 - [notes/hood_removal_charge_temps.md](https://github.com/4AM365/emu-black-tuning-notes/blob/master/notes/hood_removal_charge_temps.md) — measured charge-temp behavior the correction has to span

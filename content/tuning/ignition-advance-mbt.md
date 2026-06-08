@@ -55,7 +55,7 @@ retune cam advance you have to re-verify ignition there. The repo carries the fu
 mechanism breakdown plus theoretical MBT surfaces (238°/264°/272° cams, E0 and E100)
 to use *for shape, not as safe-to-run values.*
 
-## Dig into the notes
+## Notes
 
 - [notes/timing.md](https://github.com/4AM365/emu-black-tuning-notes/blob/master/notes/timing.md) — full principles, cam/fuel timing tables, theoretical MBT surfaces, flex-fuel blend, cruise plateau method
 - [notes/vvti.md](https://github.com/4AM365/emu-black-tuning-notes/blob/master/notes/vvti.md) — how intake cam advance shifts MBT (overlap vs. effective compression)
