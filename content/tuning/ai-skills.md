@@ -38,13 +38,13 @@ if the model can't fetch the URL.
 
 | Skill | Use it to… | Attach |
 |---|---|---|
-| [Read & edit a tune file](skills/emu-black-tune) | Decode symbols/tables, understand scaling, change values safely | `.xml.emub3` |
-| [Diagnose a data log](skills/emu-black-log) | Find why it stalled, ran lean, lost boost, knocked | `.csv` log |
-| [Smooth a VE map](skills/emu-black-ve-smooth) | Clean the steps out of an autotuned fuel map, keep trusted cells | `.xml.emub3` or table |
-| [Rescale airflow for a new DBW range](skills/emu-black-actuator-rescale) | Move the idle throttle floor/ceiling without changing how it idles | `.xml.emub3` |
-| [Export a table as .emubt](skills/emu-black-emubt-export) | Turn computed values into a file EMU can import | values / table |
-| [Audit a whole tune](skills/emu-black-tune-review) | Get a best-practice review across idle, fuel, ignition, boost | `.xml.emub3` |
-| [Street-tune VVT-i cams](skills/emu-black-vvti-street-tune) | Find the best cam advance without a dyno | log(s) `.csv` |
-| [Parse a binary log](skills/emu-black-log-emublog3) | Read a `.emublog3` directly, skip the CSV export step | `.emublog3` + one `.csv` |
+| [[emu-black-tune\|Read & edit a tune file]] | Decode symbols/tables, understand scaling, change values safely | `.xml.emub3` |
+| [[emu-black-log\|Diagnose a data log]] | Find why it stalled, ran lean, lost boost, knocked | `.csv` log |
+| [[emu-black-ve-smooth\|Smooth a VE map]] | Clean the steps out of an autotuned fuel map, keep trusted cells | `.xml.emub3` or table |
+| [[emu-black-actuator-rescale\|Rescale airflow for a new DBW range]] | Move the idle throttle floor/ceiling without changing how it idles | `.xml.emub3` |
+| [[emu-black-emubt-export\|Export a table as .emubt]] | Turn computed values into a file EMU can import | values / table |
+| [[emu-black-tune-review\|Audit a whole tune]] | Get a best-practice review across idle, fuel, ignition, boost | `.xml.emub3` |
+| [[emu-black-vvti-street-tune\|Street-tune VVT-i cams]] | Find the best cam advance without a dyno | log(s) `.csv` |
+| [[emu-black-log-emublog3\|Parse a binary log]] | Read a `.emublog3` directly, skip the CSV export step | `.emublog3` + one `.csv` |
 
 Each page has the full background plus its copy-paste block.
