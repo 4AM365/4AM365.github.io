@@ -474,7 +474,7 @@ export default function FocacciaBuildSheet() {
 
   return (
     <ThemeCtx.Provider value={C}>
-    <div style={{ background: C.paper, minHeight: "100vh", padding: "28px 16px 60px", fontFamily: "'Fraunces', serif", color: C.ink, backgroundImage: C.glow, transition: "background .25s ease, color .25s ease" }}>
+    <div style={{ background: C.paper, minHeight: "100vh", padding: "28px 16px 60px", fontFamily: "'Fraunces', serif", color: C.ink, colorScheme: dark ? "dark" : "light", backgroundImage: C.glow, transition: "background .25s ease, color .25s ease" }}>
       <style>{FONTS}</style>
       <div style={{ maxWidth: 720, margin: "0 auto", animation: "riseIn .5s ease" }}>
         {/* Header */}
