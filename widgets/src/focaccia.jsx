@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useContext } from "react";
+const goldmemberImg = "/static/goldmember.png"; // served from quartz/static
 
 // ============================================================================
 // Focaccia Dashboard — drive the *qualities* (open crumb, tang, flake, fried
@@ -14,6 +15,32 @@ import React, { useState, useMemo, useContext } from "react";
 const FONTS = `
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,800;9..144,900&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 @keyframes riseIn { from { opacity:0; transform: translateY(10px);} to {opacity:1; transform:none;} }
+`;
+
+// GeoCities skin stylesheet — injected only when the retro skin is on. Forced
+// with !important so it overrides the hardcoded inline fonts/borders without
+// rewriting every styled element. `.geo-dark`/`.geo-light` pick the tiled
+// background to match the mode toggle.
+const GEO_CSS = `
+@keyframes geoBlink { 50% { opacity: 0; } }
+@keyframes geoRainbow { 0%{color:#ff0040} 20%{color:#ff8c00} 40%{color:#ffe000} 60%{color:#00c853} 80%{color:#2962ff} 100%{color:#aa00ff} }
+.geocities, .geocities * { font-family: "Comic Sans MS","Comic Sans","Chalkboard SE",cursive !important; }
+.geocities .geo-counter, .geocities .geo-counter * { font-family: "Courier New", monospace !important; }
+.geocities button { border-style: outset !important; }
+.geocities { background-repeat: repeat !important; }
+.geocities.geo-dark { background-image:
+  radial-gradient(1.5px 1.5px at 20px 24px,#ffffff,transparent),
+  radial-gradient(1px 1px at 64px 52px,#aaeeff,transparent),
+  radial-gradient(1.5px 1.5px at 120px 88px,#ffffff,transparent),
+  radial-gradient(1px 1px at 150px 30px,#ffd0d0,transparent) !important;
+  background-size: 180px 130px !important; }
+.geocities.geo-light { background-image:
+  radial-gradient(3px 3px at 22px 24px,rgba(255,0,255,0.20),transparent),
+  radial-gradient(3px 3px at 92px 70px,rgba(0,0,238,0.16),transparent),
+  radial-gradient(3px 3px at 150px 34px,rgba(255,140,0,0.18),transparent) !important;
+  background-size: 175px 120px !important; }
+.geo-blink { animation: geoBlink 1.1s steps(1) infinite; }
+.geo-rainbow { animation: geoRainbow 5s linear infinite; font-weight: 900; }
 `;
 
 // ---- Theming ---------------------------------------------------------------
@@ -33,6 +60,24 @@ const THEMES = {
     line: "#3a322a", card: "#221c16", onAccent: "#f7efe2",
     glow: "radial-gradient(circle at 20% 10%, rgba(226,125,71,0.10), transparent 42%), radial-gradient(circle at 85% 0%, rgba(148,165,87,0.10), transparent 45%)",
     brineBg: "rgba(226,125,71,0.10)",
+  },
+  // GeoCities skin — same keys, but 1998 personal-homepage energy. The tiled
+  // background, Comic Sans, bevels and blink live in GEO_CSS (injected when the
+  // skin is on); these palettes carry the clashing colours. Two variants so the
+  // light/dark mode toggle still works *within* the retro skin (four states).
+  geoLight: {
+    paper: "#cfcfee", paperDeep: "#bcbce4", ink: "#000000", inkSoft: "#000080",
+    olive: "#ff00ff", oliveDeep: "#c800c8", rust: "#0000ee", crust: "#ff6a00",
+    line: "#808080", card: "#ffffcc", onAccent: "#ffffff",
+    glow: "none",
+    brineBg: "rgba(255,0,255,0.10)",
+  },
+  geoDark: {
+    paper: "#000018", paperDeep: "#000010", ink: "#00ff66", inkSoft: "#33ccff",
+    olive: "#ff00ff", oliveDeep: "#aa00aa", rust: "#ffe000", crust: "#ff8c00",
+    line: "#5454aa", card: "#0a0a30", onAccent: "#ffffff",
+    glow: "none",
+    brineBg: "rgba(255,224,0,0.10)",
   },
 };
 const ThemeCtx = React.createContext(THEMES.light);
@@ -73,7 +118,7 @@ const SCHEDULES = [
 // honestly rather than faked with the dials.
 const STYLES = [
   // ---- The house ----
-  { id: "flaky", cat: "The house", name: "Flaky (hot-rod)", tag: "laminated · fried",
+  { id: "flaky", cat: "The house", name: "Flaky (thatsch a keeper)", tag: "laminated · fried",
     blurb: "The house build: a 3-day cold ferment, oiled lamination folds for a shreddy pull, and a deep pan-fry. Dough kept lean so the fat works the layers and the base, not the crumb.",
     set: { hydration: 82, schIdx: 3, folds: 3, panOilPct: 10, doughOilPct: 0, saltPct: 2.4, semolinaPct: 5, twoPans: true } },
   { id: "sameday", cat: "The house", name: "Same-day", tag: "weeknight",
@@ -88,7 +133,7 @@ const STYLES = [
     blurb: "Long, cold-fermented and very wet — a tall, wildly open, custardy crumb with a crisp, blistered top. Lean and restrained; the ferment does the flavour.",
     set: { hydration: 85, schIdx: 3, folds: 0, panOilPct: 7, doughOilPct: 3, saltPct: 2.4, semolinaPct: 5, twoPans: false } },
   { id: "barese", cat: "Classic Italian", name: "Pugliese · Barese", tag: "semola · tomato",
-    blurb: "Durum-semolina dough (golden, sandy crust), high hydration, classically studded with cherry tomatoes, olives and oregano. A southern, rustic loaf.",
+    blurb: "Durum-semolina dough (golden, sandy crust), high hydration, classically studded with cherry tomatoes, olives and oregano. A southern, rustic loaf. Traditional versions also work boiled, riced potato (~20% of the flour) into the dough for a soft, moist, long-keeping crumb — the dials don't model that, so add it yourself for full authenticity.",
     set: { hydration: 80, schIdx: 1, folds: 0, panOilPct: 9, doughOilPct: 4, saltPct: 2.2, semolinaPct: 15, twoPans: true } },
 
   // ---- Regional & obscure ----
@@ -116,7 +161,7 @@ const STYLES = [
 ];
 const STYLE_CATS = ["The house", "Classic Italian", "Regional & obscure"];
 const STYLE_BY_ID = Object.fromEntries(STYLES.map((s) => [s.id, s]));
-const DEFAULT_STYLE = "flaky";
+const DEFAULT_STYLE = "genovese";
 const STYLE_KEYS = ["hydration", "schIdx", "folds", "panOilPct", "doughOilPct", "saltPct", "semolinaPct", "twoPans"];
 
 // ---- Beyond the dials: fixed recipes -------------------------------------
@@ -534,6 +579,9 @@ function buildSteps({ sch, schIdx, folds, hydration, panOilPct, doughOilPct, sem
   const oilNote = doughOilPct > 0
     ? ` Once the dough is cohesive, drizzle in the ${round(doughOilPct, 1)}% dough oil and mix until it's fully absorbed and glossy again — adding it after the gluten has formed keeps the oil from coating the proteins and blunting development.`
     : "";
+  // Short form for the always-visible spec line so the dough oil shows even in
+  // Terse mode (where the `why` text — and the full oilNote — is hidden).
+  const oilSpecNote = doughOilPct > 0 ? ` · then work in the ${round(doughOilPct, 1)}% dough oil till absorbed` : "";
   const handling = hydration >= 84 ? "very slack and glossy — work it with wet hands"
     : hydration >= 76 ? "slack but cohesive" : "supple and easy to handle";
   const hot = panOilPct >= 10;
@@ -544,7 +592,7 @@ function buildSteps({ sch, schIdx, folds, hydration, panOilPct, doughOilPct, sem
     steps.push({ title: "Fermentolyse — warm", spec: `ALL flour + all WARM water (95–100°F / 35–38°C) + yeast (${round(sch.yeast * yt.factor, 2)}%) + sugar · rest 20 min · then salt`,
       why: `On a 2-hour clock you want fermentation from minute one. Mix everything but the salt with warm water and rest 20 min, covered: the flour fully hydrates (free extensibility) and the warm water wakes the yeast immediately. Hold the salt — it tightens gluten and slows yeast, blunting the fast start you need here.${bloom}`,
       more: `Aim to finish the dough around ${ddt} — warm, so it drives.` });
-    steps.push({ title: "Mix & develop", spec: `dough hook · low speed · 6–8 min · target dough temp ${ddt}`,
+    steps.push({ title: "Mix & develop", spec: `dough hook · low speed · 6–8 min · target dough temp ${ddt}${oilSpecNote}`,
       why: `Add the salt now, then develop a moderate, cohesive gluten net — enough to trap gas fast and hold the layers. At ${hydration}% the dough is ${handling}.${oilNote}`,
       more: `Watch the temperature: glossy and clearing the bowl, not over-beaten past ~28°C/82°F. Friction heats a fast dough quickly.` });
     steps.push({ title: "Warm bulk + oiled folds — the 1 hr rise", spec: `${sch.temp} · ${folds > 0 ? `${folds} oiled letter-fold${folds > 1 ? "s" : ""}` : "2 plain folds"} at 20 & 40 min · keep it covered`,
@@ -553,7 +601,7 @@ function buildSteps({ sch, schIdx, folds, hydration, panOilPct, doughOilPct, sem
   } else {
     steps.push({ title: "Autolyse", spec: "ALL flour + all dough water · mix to shaggy · cover · rest 30–45 min",
       why: `Mix flour and water to a shaggy mass with no dry flour, cover, and walk away. Every bit of flour hydrates and the flour's own enzymes start reorganizing gluten — extensibility and structure for free, with far less mixing. Cover it so the top can't dry. Hold yeast and salt for now.${bloom}` });
-    steps.push({ title: "Mix in yeast + salt; develop", spec: `add yeast, then salt · dough hook · low · 6–8 min · target dough temp ${ddt}`,
+    steps.push({ title: "Mix in yeast + salt; develop", spec: `add yeast, then salt · dough hook · low · 6–8 min · target dough temp ${ddt}${oilSpecNote}`,
       why: `Work in the yeast first, then the salt (added last so it doesn't fight the yeast or over-tighten early). Build a moderate, well-organized matrix — strong enough to trap gas and hold lamination, loose enough to stay extensible. At ${hydration}% it pulls off the hook ${handling}; stop when cohesive, not bone-dry.${oilNote}`,
       more: `Finishing near ${ddt} sets a controlled, even cold ferment rather than a runaway one.` });
     steps.push({ title: "Bulk start + strength folds", spec: "3–4 coil/letter folds · 30 min apart · ~2 hr warm, covered",
@@ -758,6 +806,7 @@ export default function FocacciaBuildSheet() {
   const [prepDone, setPrepDone] = useState({});         // mise-en-place checklist
   const [verbosity, setVerbosity] = useState(1);
   const [dark, setDark] = useState(false);
+  const [geocities, setGeocities] = useState(true); // retro skin axis — default ON (GeoCities-light is the boot state)
   const [openStep, setOpenStep] = useState("01");
   const [special, setSpecial] = useState(null); // a "beyond the dials" fixed recipe, or null
   // kitchen environment (altitude + humidity for a ZIP/day, plus room temp)
@@ -771,7 +820,9 @@ export default function FocacciaBuildSheet() {
   const [envError, setEnvError] = useState("");
   const [envApplied, setEnvApplied] = useState(true); // fold the recalibration into the recipe
 
-  const C = dark ? THEMES.dark : THEMES.light;
+  // Two independent axes → four palettes: {modern,geo} × {light,dark}.
+  const C = geocities ? (dark ? THEMES.geoDark : THEMES.geoLight)
+                      : (dark ? THEMES.dark : THEMES.light);
 
   function applyStyle(id) {
     const s = STYLE_BY_ID[id];
@@ -946,9 +997,25 @@ export default function FocacciaBuildSheet() {
 
   return (
     <ThemeCtx.Provider value={C}>
-    <div style={{ background: C.paper, minHeight: "100vh", padding: "28px 16px 60px", fontFamily: "'Fraunces', serif", color: C.ink, colorScheme: dark ? "dark" : "light", backgroundImage: C.glow, transition: "background .25s ease, color .25s ease" }}>
+    <div className={geocities ? `geocities ${dark ? "geo-dark" : "geo-light"}` : undefined} style={{ backgroundColor: C.paper, minHeight: "100vh", padding: "28px 16px 60px", fontFamily: "'Fraunces', serif", color: C.ink, colorScheme: dark ? "dark" : "light", backgroundImage: C.glow, transition: "background .25s ease, color .25s ease" }}>
       <style>{FONTS}</style>
+      {geocities && <style>{GEO_CSS}</style>}
       <div style={{ width: "100%", maxWidth: 880, margin: "0 auto", animation: "riseIn .5s ease" }}>
+        {/* GeoCities banner — only on the retro skin */}
+        {geocities && (
+          <div style={{ marginBottom: 16, textAlign: "center" }}>
+            <marquee scrollamount="6" style={{ background: "#000080", color: "#00ff66", border: "3px ridge #c0c0c0", padding: "5px 0", fontWeight: 700, fontSize: 14 }}>
+              ✨🔥 Welcome to Will&apos;s Fantastic Focaccia HomePage!! 🔥✨ &nbsp; Best viewed in Netscape Navigator 4.0 at 800×600 &nbsp; ✨ Don&apos;t forget to sign my guestbook!! ✨
+            </marquee>
+            <div style={{ marginTop: 9, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", alignItems: "center", fontSize: 13 }}>
+              <span className="geo-blink" style={{ color: C.rust, fontWeight: 900, letterSpacing: 1 }}>🚧 UNDER CONSTRUCTION 🚧</span>
+              <span className="geo-counter" style={{ background: "#000", color: "#00ff00", border: "2px inset #00ff00", padding: "2px 7px", letterSpacing: 4, fontWeight: 700 }}>
+                ⛏ Visitors: 0013372
+              </span>
+              <span className="geo-rainbow" style={{ fontWeight: 900 }}>~ * Hot! * ~</span>
+            </div>
+          </div>
+        )}
         {/* Header */}
         <div style={{ borderBottom: `2px solid ${C.ink}`, paddingBottom: 14, marginBottom: 18, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 8 }}>
           <div>
@@ -972,11 +1039,21 @@ export default function FocacciaBuildSheet() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
                 {STYLES.filter((s) => s.cat === cat).map((s) => {
                   const on = !special && activeStyle === s.id;
+                  // Easter egg: when the house "flaky" tile is the *selected* style,
+                  // Goldmember fills its background (a dark wash keeps the label
+                  // legible). Picking any other style clears it. Persistent, unlike
+                  // the old press-and-hold — a click is too brief to ever see.
+                  const goldOn = s.id === "flaky" && on;
                   return (
                     <button key={s.id} onClick={() => applyStyle(s.id)} style={{
                       display: "flex", gap: 9, alignItems: "flex-start", textAlign: "left", cursor: "pointer",
                       borderRadius: 11, padding: "11px 12px", transition: "all .15s ease", fontFamily: "'Fraunces', serif",
-                      border: `1.5px solid ${on ? C.olive : C.line}`, background: on ? C.olive : C.card, color: on ? C.onAccent : C.ink }}>
+                      border: `1.5px solid ${on ? C.olive : C.line}`,
+                      background: goldOn
+                        ? `linear-gradient(rgba(0,0,0,0.32), rgba(0,0,0,0.42)), ${C.olive} url(${goldmemberImg}) center / cover no-repeat`
+                        : on ? C.olive : C.card,
+                      color: on ? C.onAccent : C.ink,
+                      textShadow: goldOn ? "0 1px 3px rgba(0,0,0,0.9)" : "none" }}>
                       <span style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${on ? C.onAccent : C.line}`, flexShrink: 0, marginTop: 2, position: "relative" }}>
                         {on && <span style={{ position: "absolute", inset: 2.5, borderRadius: "50%", background: C.onAccent }} />}
                       </span>
@@ -1254,7 +1331,8 @@ export default function FocacciaBuildSheet() {
             {TOPPINGS.map((t) => {
               const on = !!toppingSel[t.id];
               const trad = activeStyle !== "custom" && t.styles.includes(activeStyle);
-              const badge = activeStyle === "custom" ? `classic in ${t.styles.length}` : trad ? "traditional" : "modern twist";
+              const nStyles = t.styles.length;
+              const badge = activeStyle === "custom" ? `classic in ${nStyles} style${nStyles === 1 ? "" : "s"}` : trad ? "traditional" : "modern twist";
               const badgeCol = trad ? C.olive : C.inkSoft;
               return (
                 <button key={t.id} onClick={() => toggleTopping(t.id)} style={{
@@ -1361,7 +1439,10 @@ export default function FocacciaBuildSheet() {
               {VERBOSITY.map((lbl, i) => <span key={lbl} style={{ color: i === verbosity ? C.olive : C.inkSoft, fontWeight: i === verbosity ? 600 : 400, flex: 1, textAlign: "center" }}>{lbl.toLowerCase()}</span>)}
             </div>
           </div>
-          <Toggle on={dark} onClick={() => setDark((d) => !d)} label={dark ? "Dark mode" : "Light mode"} sub={dark ? "warm charcoal" : "warm paper"} />
+          <div style={{ display: "grid", gap: 10 }}>
+            <Toggle on={geocities} onClick={() => setGeocities((g) => !g)} label={geocities ? "GeoCities ✨" : "Modern"} sub={geocities ? "like it's 1998" : "clean & calm"} />
+            <Toggle on={dark} onClick={() => setDark((d) => !d)} label={dark ? "Dark mode" : "Light mode"} sub={dark ? (geocities ? "neon starfield" : "warm charcoal") : (geocities ? "clashing pastels" : "warm paper")} />
+          </div>
         </div>
 
         {/* Live profile chips */}
