@@ -1,4 +1,4 @@
-const VIBES = ["jdm", "geocities"]
+const VIBES = ["jdm", "geocities", "modern"]
 const DEFAULT_VIBE = "jdm"
 
 const readVibe = (): string => {
@@ -23,6 +23,8 @@ const setVibe = (vibe: string) => {
     localStorage.setItem("vibe", vibe)
   } catch {}
   applyActiveState()
+  // Let same-page widgets (e.g. the focaccia calculator) re-skin live.
+  document.dispatchEvent(new CustomEvent("vibechange", { detail: { vibe } }))
 }
 
 // Apply initial vibe immediately so first paint matches preference.
