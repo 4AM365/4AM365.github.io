@@ -45,6 +45,82 @@ function round(n, dp = 0) {
   return Math.round(n * f) / f;
 }
 const fToC = (f) => round(((f - 32) * 5) / 9 / 5) * 5; // °F -> nearest 5°C
+const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+
+// ---------------------------------------------------------------------------
+// Kitchen environment — altitude, humidity & room temperature recalibration
+// ---------------------------------------------------------------------------
+// Where and when you bake changes a cookie dough, and each factor maps to a
+// distinct, well-understood mechanism:
+//   • Altitude → chemical leavening (+ sugar, + bake). Lower air pressure lets
+//     the leavening's gas expand more, so cookies dome then collapse — cut the
+//     soda/powder. Sugar melts and makes the dough flow, worsening the spread,
+//     so trim it too; and bake hotter/shorter to set the structure before it
+//     over-spreads. (Standard high-altitude baking guidance, from ~3000 ft.)
+//   • Humidity → spread & texture. Sugars (brown especially) and flour are
+//     hygroscopic, so a humid day slackens the dough and it bakes flatter and
+//     cakier — chilling and a touch more flour pull it back.
+//   • Room temperature → butter/dough temperature, which governs spread. Warm
+//     butter softens and the cookie spreads thin and greasy; cold dough holds a
+//     tall, soft-centred shape. A warm kitchen wants a chill before baking.
+const ENV_BASE_RH = 60;             // % RH the base formula assumes
+const ENV_ALT_THRESHOLD_FT = 3000;  // high-altitude adjustments begin here
+
+function computeEnvAdjust({ elevFt, humidityPct, roomTempF }) {
+  const ftAbove = Math.max(0, elevFt - ENV_ALT_THRESHOLD_FT);
+  // Altitude → leavening: trim ~0.6% of the dose per 100 ft above the threshold.
+  const leavenFactor = clamp(1 - (ftAbove / 100) * 0.006, 0.75, 1);
+  // Altitude → sugar: reduce up to 5% of flour, capped (less flow = less spread).
+  const sugarDeltaPct = -clamp((ftAbove / 1000) * 1, 0, 5);
+  // Altitude → hotter, shorter bake.
+  const ovenBumpF = elevFt > 6000 ? 25 : elevFt > ENV_ALT_THRESHOLD_FT ? 15 : 0;
+  // Humidity → how much wetter than baseline the air (and so the dough) is.
+  const humid = humidityPct - ENV_BASE_RH;
+  // Room temp → butter softness → spread risk; warm or humid wants a chill.
+  const warmKitchen = roomTempF >= 75;
+  const recommendChill = humid > 12 || warmKitchen;
+  const spreadRisk = roomTempF >= 80 ? "high" : roomTempF >= 72 ? "moderate" : roomTempF <= 62 ? "low" : "low–moderate";
+  return { elevFt, humidityPct, roomTempF, ftAbove, leavenFactor, sugarDeltaPct, ovenBumpF,
+    humid, warmKitchen, recommendChill, spreadRisk };
+}
+
+// ZIP → lat/lon (Zippopotam.us) → elevation + that day's mean humidity
+// (Open-Meteo). All three are free, key-less, CORS-enabled browser APIs.
+async function fetchKitchenEnv(zip, dateISO) {
+  const z = String(zip).trim();
+  if (!/^\d{5}$/.test(z)) throw new Error("Enter a 5-digit US ZIP code.");
+  const geoR = await fetch(`https://api.zippopotam.us/us/${z}`);
+  if (!geoR.ok) throw new Error(`No US location found for ZIP ${z}.`);
+  const geo = await geoR.json();
+  const place = geo.places && geo.places[0];
+  if (!place) throw new Error(`No US location found for ZIP ${z}.`);
+  const lat = Number(place.latitude), lon = Number(place.longitude);
+  const placeName = `${place["place name"]}, ${place["state abbreviation"] || place.state}`;
+  const day = 864e5;
+  const today = new Date().toISOString().slice(0, 10);
+  const earliest = new Date(Date.now() - 90 * day).toISOString().slice(0, 10);
+  const latest = new Date(Date.now() + 16 * day).toISOString().slice(0, 10);
+  // Open-Meteo's forecast model serves ~90 days back to 16 days ahead; older
+  // dates come from the historical archive instead.
+  const wxBase = (dateISO >= earliest && dateISO <= latest)
+    ? "https://api.open-meteo.com/v1/forecast"
+    : "https://archive-api.open-meteo.com/v1/archive";
+  const [elevR, wxR] = await Promise.all([
+    fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`),
+    fetch(`${wxBase}?latitude=${lat}&longitude=${lon}&hourly=relative_humidity_2m&start_date=${dateISO}&end_date=${dateISO}&timezone=auto`),
+  ]);
+  if (!elevR.ok) throw new Error("Couldn't fetch elevation for that location.");
+  if (!wxR.ok) throw new Error("Couldn't fetch the weather for that date.");
+  const elevJ = await elevR.json();
+  const wxJ = await wxR.json();
+  const elevM = Array.isArray(elevJ.elevation) ? elevJ.elevation[0] : elevJ.elevation;
+  const rh = ((wxJ.hourly && wxJ.hourly.relative_humidity_2m) || []).filter((x) => x != null);
+  if (elevM == null) throw new Error("Couldn't read elevation for that location.");
+  if (!rh.length) throw new Error("No humidity data for that date — try one within ~2 weeks.");
+  const humidityPct = Math.round(rh.reduce((a, b) => a + b, 0) / rh.length);
+  return { place: placeName, elevM: Math.round(elevM), elevFt: Math.round(elevM * 3.28084),
+    humidityPct, date: dateISO };
+}
 
 // ---- Fixed (non-dialed) constants -----------------------------------------
 // Chemical leavening, expressed as a % of flour, at the extremes of the
@@ -724,6 +800,14 @@ export default function CookieBuildSheet() {
   const [dark, setDark] = useState(false);
   const [openStep, setOpenStep] = useState("01");
   const [special, setSpecial] = useState(null);           // a fixed recipe, or null
+  // kitchen environment (altitude + humidity for a ZIP/day, plus room temp)
+  const [zip, setZip] = useState("");
+  const [envDate, setEnvDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [roomTempF, setRoomTempF] = useState(72);
+  const [envData, setEnvData] = useState(null);     // { place, elevFt, elevM, humidityPct, date }
+  const [envLoading, setEnvLoading] = useState(false);
+  const [envError, setEnvError] = useState("");
+  const [envApplied, setEnvApplied] = useState(true); // fold the recalibration into the recipe
 
   const C = dark ? THEMES.dark : THEMES.light;
 
@@ -756,38 +840,65 @@ export default function CookieBuildSheet() {
   const effFlour = f - cocoaLoad;                 // the flour left to build structure
   const cocoa = { on: cocoaOn, mode: cocoaMode, pct: cocoaPct, load: cocoaLoad, effFlour };
 
+  // Kitchen-environment recalibration. Altitude trims the leavening and sugar
+  // (folded into the live recipe once data is fetched and "apply" is on, never
+  // over a fixed recipe); the oven bump, chill and butter-temperature advice
+  // are guidance the room temp and humidity always drive.
+  const rt = clamp(Number(roomTempF) || 70, 40, 110);
+  const envAdj = useMemo(
+    () => (envData ? computeEnvAdjust({ elevFt: envData.elevFt, humidityPct: envData.humidityPct, roomTempF: rt }) : null),
+    [envData, rt]
+  );
+  const envOn = !!(envData && envApplied && !special);
+  const sugarPctEff = Math.max(0, round(sugarPct + (envOn ? envAdj.sugarDeltaPct : 0), 1));
+  const leavenEnvFactor = envOn ? envAdj.leavenFactor : 1;
+
+  async function runEnvFetch() {
+    setEnvLoading(true);
+    setEnvError("");
+    try {
+      setEnvData(await fetchKitchenEnv(zip, envDate));
+    } catch (e) {
+      setEnvData(null);
+      setEnvError(e.message || "Couldn't fetch conditions.");
+    } finally {
+      setEnvLoading(false);
+    }
+  }
+
   const v = useMemo(() => {
-    const totalSugar = f * (sugarPct / 100);
+    const totalSugar = f * (sugarPctEff / 100);
     const brown = totalSugar * (brownPct / 100);
     const white = totalSugar - brown;
     const butter = f * (butterPct / 100);
     const egg = f * (eggPct / 100);
     const salt = f * (saltPct / 100);
-    const soda = leaven ? f * (SODA_MAX / 100) * (sodaShare / 100) : 0;
-    const powder = leaven ? f * (POWDER_MAX / 100) * (1 - sodaShare / 100) : 0;
+    const soda = leaven ? f * (SODA_MAX / 100) * (sodaShare / 100) * leavenEnvFactor : 0;
+    const powder = leaven ? f * (POWDER_MAX / 100) * (1 - sodaShare / 100) * leavenEnvFactor : 0;
     const chips = addinSel.chips ? f * (CHIPS_PCT / 100) : 0;
     const flourMass = f - cocoaLoad;
     const doughWeight = flourMass + cocoaLoad + totalSugar + butter + egg + soda + powder + chips;
     return { totalSugar, brown, white, butter, egg, salt, soda, powder, chips, flourMass, doughWeight };
-  }, [f, sugarPct, brownPct, butterPct, eggPct, saltPct, leaven, sodaShare, addinSel.chips, cocoaLoad]);
+  }, [f, sugarPctEff, brownPct, butterPct, eggPct, saltPct, leaven, sodaShare, addinSel.chips, cocoaLoad, leavenEnvFactor]);
 
   const specialDef = special ? SPECIAL_BY_ID[special] : null;
   const specialRecipe = useMemo(() => (specialDef ? specialDef.recipe(f) : null), [special, f]);
 
-  const sodaPct = leaven ? round(SODA_MAX * (sodaShare / 100), 2) : 0;
-  const powderPct = leaven ? round(POWDER_MAX * (1 - sodaShare / 100), 2) : 0;
+  const sodaPct = leaven ? round(SODA_MAX * (sodaShare / 100) * leavenEnvFactor, 2) : 0;
+  const powderPct = leaven ? round(POWDER_MAX * (1 - sodaShare / 100) * leavenEnvFactor, 2) : 0;
   const eggCount = v.egg > 0 ? round(v.egg / EGG_G, 1) : 0;
 
   const dialGroups = [
     { title: "Dough", items: [
       { k: `Flour — ${flour.name.toLowerCase()}`, g: round(v.flourMass), pct: round(100 - cocoaPctEff, 1), note: flour.prot },
       ...(cocoaOn ? [{ k: `Cocoa — ${cocoaMode}`, g: round(cocoaLoad), pct: round(cocoaPctEff, 1), accent: true, note: "swapped in for flour" }] : []),
-      { k: "White sugar", g: round(v.white), pct: round(sugarPct * (1 - brownPct / 100), 1), note: "spread & crisp · caramelizes" },
-      ...(v.brown > 0 ? [{ k: "Brown sugar", g: round(v.brown), pct: round(sugarPct * (brownPct / 100), 1), accent: true, note: "molasses · moisture · chew" }] : []),
+      { k: "White sugar", g: round(v.white), pct: round(sugarPctEff * (1 - brownPct / 100), 1), accent: envOn && envAdj.sugarDeltaPct !== 0,
+        note: envOn && envAdj.sugarDeltaPct !== 0 ? `${sugarPct}% → ${sugarPctEff}% total — trimmed for altitude spread` : "spread & crisp · caramelizes" },
+      ...(v.brown > 0 ? [{ k: "Brown sugar", g: round(v.brown), pct: round(sugarPctEff * (brownPct / 100), 1), accent: true, note: "molasses · moisture · chew" }] : []),
       { k: `Butter — ${METHODS[method].label.toLowerCase().replace(" (one-bowl)", "")}`, g: round(v.butter), pct: round(butterPct, 1), note: METHODS[method].short },
       ...(eggPct > 0 ? [{ k: `Egg — ${EGG_FORMS[eggForm].label.toLowerCase()}`, g: round(v.egg), pct: round(eggPct, 1), note: `~${eggCount} large · ${EGG_FORMS[eggForm].short}` }] : []),
-      ...(leaven && v.soda > 0 ? [{ k: "Baking soda", g: round(v.soda, 1), pct: sodaPct, accent: true, note: "needs acid · browns & spreads" }] : []),
-      ...(leaven && v.powder > 0 ? [{ k: "Baking powder", g: round(v.powder, 1), pct: powderPct, note: "self-acting · puffs & pales" }] : []),
+      ...(leaven && v.soda > 0 ? [{ k: "Baking soda", g: round(v.soda, 1), pct: sodaPct, accent: true, note: envOn && leavenEnvFactor < 1 ? `−${round((1 - leavenEnvFactor) * 100)}% for altitude — thin air over-puffs` : "needs acid · browns & spreads" }] : []),
+      ...(leaven && v.powder > 0 ? [{ k: "Baking powder", g: round(v.powder, 1), pct: powderPct, note: envOn && leavenEnvFactor < 1 ? `−${round((1 - leavenEnvFactor) * 100)}% for altitude` : "self-acting · puffs & pales" }] : []),
       ...(!leaven ? [{ k: "Chemical leavening", g: null, pct: null, note: "none — short/shortbread style" }] : []),
       { k: "Salt", g: round(v.salt, 1), pct: round(saltPct, 1), note: "seasons · sharpens the sweet" },
       { k: "Vanilla", g: null, pct: null, note: "1–2 tsp, to taste" },
@@ -831,6 +942,16 @@ export default function CookieBuildSheet() {
   const profile = specialRecipe ? specialRecipe.profile : dialProfile;
   const showWhy = verbosity >= 1;
   const ovenC = fToC(ovenF);
+
+  const mono = "'IBM Plex Mono', monospace";
+  const envFieldLabel = { display: "flex", flexDirection: "column", gap: 5, fontFamily: mono, fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: C.inkSoft, fontWeight: 600 };
+  const envFieldInput = { fontFamily: mono, fontSize: 15, padding: "9px 11px", borderRadius: 9, border: `1.5px solid ${C.line}`, background: C.paperDeep, color: C.ink, outline: "none" };
+  const envStat = (label, value) => (
+    <div key={label} style={{ flex: "1 1 120px", background: C.card, border: `1.5px solid ${C.line}`, borderRadius: 10, padding: "9px 12px" }}>
+      <div style={{ fontFamily: mono, fontSize: 9.5, letterSpacing: 1, textTransform: "uppercase", color: C.inkSoft, fontWeight: 600 }}>{label}</div>
+      <div style={{ fontFamily: mono, fontSize: 18, fontWeight: 600, color: C.butter }}>{value}</div>
+    </div>
+  );
 
   return (
     <ThemeCtx.Provider value={C}>
@@ -931,6 +1052,118 @@ export default function CookieBuildSheet() {
           </div>
         </div>
 
+        {/* Kitchen environment — altitude + humidity (by ZIP/day) + room temp */}
+        <div style={{ background: C.card, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "16px 18px", marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 6, marginBottom: 4 }}>
+            <span style={{ fontSize: 16, fontWeight: 600 }}>Kitchen environment</span>
+            <span style={{ fontFamily: mono, fontSize: 11, color: C.inkSoft }}>altitude · humidity · room temp</span>
+          </div>
+          <div style={{ fontSize: 13, color: C.inkSoft, fontStyle: "italic", marginBottom: 13 }}>
+            Pull your elevation and the day's humidity from a US ZIP code, add the room temperature, and the formula recalibrates — leavening, sugar, the bake and how much to chill.
+          </div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <label style={{ ...envFieldLabel, flex: "1 1 120px" }}>
+              ZIP code
+              <input value={zip} inputMode="numeric" placeholder="e.g. 80401"
+                onChange={(e) => setZip(e.target.value.replace(/\D/g, "").slice(0, 5))}
+                onKeyDown={(e) => { if (e.key === "Enter") runEnvFetch(); }}
+                style={envFieldInput} />
+            </label>
+            <label style={{ ...envFieldLabel, flex: "1 1 140px" }}>
+              Date
+              <input type="date" value={envDate} onChange={(e) => setEnvDate(e.target.value)} style={envFieldInput} />
+            </label>
+            <label style={{ ...envFieldLabel, flex: "1 1 120px" }}>
+              Room temp
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input type="number" value={roomTempF} min={40} max={110}
+                  onChange={(e) => setRoomTempF(e.target.value)} style={{ ...envFieldInput, width: "100%" }} />
+                <span style={{ fontFamily: mono, fontSize: 12, color: C.inkSoft, whiteSpace: "nowrap" }}>°F · {round((rt - 32) * 5 / 9)}°C</span>
+              </span>
+            </label>
+            <button onClick={runEnvFetch} disabled={envLoading}
+              style={{ fontFamily: mono, fontSize: 13, fontWeight: 600, padding: "10px 16px", borderRadius: 9, border: "none", cursor: envLoading ? "default" : "pointer", background: C.butterDeep, color: C.onAccent, opacity: envLoading ? 0.6 : 1, whiteSpace: "nowrap" }}>
+              {envLoading ? "Fetching…" : "Fetch conditions"}
+            </button>
+          </div>
+
+          {envError && (
+            <div style={{ marginTop: 11, fontSize: 13, color: C.choc, fontWeight: 600 }}>⚠ {envError}</div>
+          )}
+
+          {envData && envAdj && (
+            <div style={{ marginTop: 14, background: C.mixBg, border: `1.5px solid ${C.choc}`, borderRadius: 12, padding: "13px 15px", animation: "riseIn .2s ease" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 11 }}>
+                <span style={{ fontSize: 14.5, fontWeight: 600 }}>📍 {envData.place} · {envData.date}</span>
+                <button onClick={() => setEnvApplied((a) => !a)} disabled={!!special}
+                  style={{ display: "flex", alignItems: "center", gap: 8, background: envOn ? C.choc : "transparent", color: envOn ? C.onAccent : C.choc, border: `1.5px solid ${C.choc}`, borderRadius: 20, padding: "6px 13px", cursor: special ? "default" : "pointer", opacity: special ? 0.5 : 1, fontFamily: mono, fontSize: 12, fontWeight: 600 }}>
+                  {envOn ? "✓ applied to recipe" : envApplied && special ? "n/a for fixed recipe" : "apply to recipe"}
+                </button>
+              </div>
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+                {envStat("Elevation", `${envData.elevFt.toLocaleString()} ft`)}
+                {envStat("Humidity", `${envData.humidityPct}%`)}
+                {envStat("Room", `${rt}°F`)}
+              </div>
+
+              <div style={{ fontFamily: mono, fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: C.choc, fontWeight: 600, marginBottom: 9 }}>
+                Scientific recalibration
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                {[
+                  ...(leaven && envAdj.leavenFactor < 1 ? [{
+                    label: "Leavening",
+                    value: `×${envAdj.leavenFactor.toFixed(2)} (−${round((1 - envAdj.leavenFactor) * 100)}%)`,
+                    on: envOn,
+                    why: `At ${envData.elevFt.toLocaleString()} ft the lower air pressure lets the soda/powder's gas expand more, so cookies dome then collapse — cut the leavening so they set flat and even.`,
+                  }] : []),
+                  ...(envAdj.sugarDeltaPct !== 0 ? [{
+                    label: "Sugar",
+                    value: `${sugarPct}% → ${Math.max(0, round(sugarPct + envAdj.sugarDeltaPct, 1))}%`,
+                    on: envOn,
+                    why: "Sugar melts and makes the dough flow, so it drives spread. Trimming it at altitude (with a touch more flour, if the dough is slack) helps the cookie set before it over-spreads.",
+                  }] : []),
+                  ...(envAdj.ovenBumpF > 0 ? [{
+                    label: "Oven",
+                    value: `set +${envAdj.ovenBumpF}°F, bake shorter`,
+                    on: true,
+                    why: "Standard high-altitude move: a hotter, shorter bake sets the edges before the fast-spreading dough goes flat and dry.",
+                  }] : []),
+                  {
+                    label: "Chill before baking",
+                    value: envAdj.recommendChill ? "recommended (≥1 hr)" : "optional",
+                    on: true,
+                    why: envAdj.recommendChill
+                      ? `Your ${rt}°F room${envData.humidityPct > ENV_BASE_RH ? ` and ${envData.humidityPct}% humidity` : ""} means soft butter and a slack, hygroscopic dough — both push the cookie to over-spread. Chilling firms the fat so it holds its shape.`
+                      : `Your ${rt}°F room and ${envData.humidityPct}% humidity are in the comfortable range — chilling is about flavour and shape, not damage control here.`,
+                  },
+                  {
+                    label: "Butter / dough temp",
+                    value: `${envAdj.spreadRisk} spread risk`,
+                    on: true,
+                    why: `Spread is governed by how soft the butter is when it hits the oven. At ${rt}°F your butter runs ${rt >= 75 ? "soft — cream it just to combine (not fluffy), or chill the scooped dough" : rt <= 62 ? "firm — let it warm a little before creaming so it aerates" : "about right for creaming"}.`,
+                  },
+                ].map((ln) => (
+                  <div key={ln.label} style={{ opacity: ln.on ? 1 : 0.5 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+                      <span style={{ fontSize: 14, fontWeight: 600 }}>{ln.label}{!ln.on && <span style={{ fontFamily: mono, fontSize: 10.5, color: C.inkSoft, fontWeight: 400 }}> · toggle on to apply</span>}</span>
+                      <span style={{ fontFamily: mono, fontSize: 13.5, color: C.choc, fontWeight: 600, whiteSpace: "nowrap" }}>{ln.value}</span>
+                    </div>
+                    <div style={{ fontSize: 12.5, lineHeight: 1.45, color: C.inkSoft, marginTop: 2 }}>{ln.why}</div>
+                  </div>
+                ))}
+              </div>
+              {special && (
+                <div style={{ marginTop: 11, fontSize: 12.5, color: C.inkSoft, fontStyle: "italic" }}>
+                  The bake, chill and butter guidance still applies, but the leavening/sugar recalibration only folds into the dial-driven recipes — {specialDef.name} runs its own fixed formula.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Fixed-recipe banner — the dials don't apply here */}
         {special && (
           <div style={{ background: C.mixBg, border: `1.5px solid ${C.choc}`, borderRadius: 12, padding: "12px 15px", marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -950,7 +1183,7 @@ export default function CookieBuildSheet() {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
           <Dial label="Sugar — total" value={sugarPct} min={45} max={120} step={5}
-            onChange={setSugarPct} readout={`${sugarPct}% · ${round(v.totalSugar)}g`} lo="lean / less sweet" hi="rich / candy-sweet"
+            onChange={setSugarPct} readout={envOn && envAdj.sugarDeltaPct !== 0 ? `${sugarPct}% → ${sugarPctEff}% · ${round(v.totalSugar)}g` : `${sugarPct}% · ${round(v.totalSugar)}g`} lo="lean / less sweet" hi="rich / candy-sweet"
             why="Sugar as a % of flour. Sugar does far more than sweeten: it melts and dissolves in the heat so the dough flows — more sugar means more spread and a crisper, more caramelized cookie. It also tenderises (competing for water, it interferes with gluten and slows egg set) and fuels browning (McGee; Bressanini, zuccheri)." />
           <Dial label="Brown : white sugar" value={brownPct} min={0} max={100} step={5} accent
             onChange={setBrownPct} readout={brownPct === 0 ? "all white" : brownPct === 100 ? "all brown" : `${brownPct}% brown`} lo="all white / crisp" hi="all brown / chewy"
