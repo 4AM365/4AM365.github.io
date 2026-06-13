@@ -12,10 +12,11 @@ and calling out what has to cool or dry before it goes on. The same prep is also
 listed linearly, in order, as a tick-as-you-go checklist.
 
 A **kitchen-environment** panel pulls your elevation and the day's humidity from
-a US ZIP code and takes your room temperature, then recalibrates the formula on
-the science: dry or humid air shifts the hydration, altitude trims the yeast and
-adds a little water (thin air lets the dough over-proof), and your room
-temperature sets the mixing-water temperature and how fast the ferment will
-really run.
+a US ZIP code — or take your own readings: enter the room temperature in °F or
+°C and your indoor humidity (handy when a humidifier or HVAC makes the kitchen
+differ from outside). It then recalibrates the formula on the science: dry or
+humid air shifts the hydration, altitude trims the yeast and adds a little water
+(thin air lets the dough over-proof), and your room temperature sets the
+mixing-water temperature and how fast the ferment will really run.
 
 <div data-widget="focaccia"></div>

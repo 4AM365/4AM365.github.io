@@ -763,7 +763,9 @@ export default function FocacciaBuildSheet() {
   // kitchen environment (altitude + humidity for a ZIP/day, plus room temp)
   const [zip, setZip] = useState("");
   const [envDate, setEnvDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [roomTempF, setRoomTempF] = useState(72);
+  const [roomTempInput, setRoomTempInput] = useState("72"); // value as typed, in `tempUnit`
+  const [tempUnit, setTempUnit] = useState("F");            // 'F' | 'C'
+  const [humidityManual, setHumidityManual] = useState(""); // blank = use the fetched value
   const [envData, setEnvData] = useState(null);     // { place, elevFt, elevM, humidityPct, date }
   const [envLoading, setEnvLoading] = useState(false);
   const [envError, setEnvError] = useState("");
@@ -800,16 +802,27 @@ export default function FocacciaBuildSheet() {
   const tomato = { on: tomatoOn, mode: tomatoMode, pct: tomatoPct, load: tomatoLoad,
     water: tomatoWater, eff: effHydration, suggested: suggestedHyd };
 
-  // Kitchen-environment recalibration. The room-temp dial always feeds the DDT
-  // water-temp / ferment-speed advice; the altitude + humidity deltas only fold
-  // into the live recipe once data is fetched and "apply" is on (and never over
-  // a fixed recipe, which carries its own formula).
-  const rt = clamp(Number(roomTempF) || ENV_FERMENT_REF_F, 40, 110);
+  // Kitchen-environment recalibration. Room temperature is entered in °F or °C
+  // (converted to °F for the science). Humidity comes from the ZIP/day fetch but
+  // a manual entry overrides it — useful when a humidifier or HVAC makes the
+  // indoor air differ from outdoors. The altitude + humidity deltas only fold
+  // into the live recipe once we have a humidity figure and "apply" is on (and
+  // never over a fixed recipe, which carries its own formula). Altitude needs a
+  // fetched elevation; without one it's treated as sea level.
+  const rtRaw = Number(roomTempInput);
+  const rtF = tempUnit === "C" ? rtRaw * 9 / 5 + 32 : rtRaw;
+  const rt = clamp(Number.isFinite(rtF) ? rtF : ENV_FERMENT_REF_F, 40, 110);
+  const rtAltUnit = tempUnit === "F" ? round((rt - 32) * 5 / 9, 1) : round(rt, 1); // the other-unit readout
+  const humidityUsed = humidityManual.trim() !== "" ? clamp(Number(humidityManual) || 0, 0, 100)
+    : (envData ? envData.humidityPct : null);
+  const humidityIsManual = humidityManual.trim() !== "";
+  const elevFtUsed = envData ? envData.elevFt : 0;
+  const condReady = humidityUsed != null;
   const envAdj = useMemo(
-    () => (envData ? computeEnvAdjust({ elevFt: envData.elevFt, humidityPct: envData.humidityPct, roomTempF: rt }) : null),
-    [envData, rt]
+    () => (condReady ? computeEnvAdjust({ elevFt: elevFtUsed, humidityPct: humidityUsed, roomTempF: rt }) : null),
+    [condReady, elevFtUsed, humidityUsed, rt]
   );
-  const envOn = !!(envData && envApplied && !special);
+  const envOn = !!(condReady && envApplied && !special);
   const hydrationAdj = round(clamp(hydration + (envOn ? envAdj.hydrationDelta : 0), 55, 100), 1);
   const yeastEnvFactor = envOn ? envAdj.yeastFactor : 1;
 
@@ -824,6 +837,17 @@ export default function FocacciaBuildSheet() {
     } finally {
       setEnvLoading(false);
     }
+  }
+  // Switch the room-temp unit, converting the entered value so it stays the
+  // same physical temperature.
+  function switchTempUnit(u) {
+    if (u === tempUnit) return;
+    const n = Number(roomTempInput);
+    if (Number.isFinite(n) && roomTempInput.trim() !== "") {
+      const conv = u === "C" ? (n - 32) * 5 / 9 : n * 9 / 5 + 32;
+      setRoomTempInput(String(round(conv, 1)));
+    }
+    setTempUnit(u);
   }
 
   const v = useMemo(() => {
@@ -924,7 +948,7 @@ export default function FocacciaBuildSheet() {
     <ThemeCtx.Provider value={C}>
     <div style={{ background: C.paper, minHeight: "100vh", padding: "28px 16px 60px", fontFamily: "'Fraunces', serif", color: C.ink, colorScheme: dark ? "dark" : "light", backgroundImage: C.glow, transition: "background .25s ease, color .25s ease" }}>
       <style>{FONTS}</style>
-      <div style={{ maxWidth: 720, margin: "0 auto", animation: "riseIn .5s ease" }}>
+      <div style={{ width: "100%", maxWidth: 880, margin: "0 auto", animation: "riseIn .5s ease" }}>
         {/* Header */}
         <div style={{ borderBottom: `2px solid ${C.ink}`, paddingBottom: 14, marginBottom: 18, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 8 }}>
           <div>
@@ -1028,28 +1052,21 @@ export default function FocacciaBuildSheet() {
             <span style={{ fontFamily: mono, fontSize: 11, color: C.inkSoft }}>altitude · humidity · room temp</span>
           </div>
           <div style={{ fontSize: 13, color: C.inkSoft, fontStyle: "italic", marginBottom: 13 }}>
-            Pull your elevation and the day's humidity from a US ZIP code, add the room temperature, and the formula recalibrates — dough water, yeast, mixing-water temperature and the bake.
+            Pull your elevation and the day's humidity from a US ZIP code (or type your own indoor humidity), set the room temperature in °F or °C, and the formula recalibrates — dough water, yeast, mixing-water temperature and the bake.
           </div>
 
+          {/* Location → fetch */}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-            <label style={{ ...envFieldLabel, flex: "1 1 120px" }}>
+            <label style={{ ...envFieldLabel, flex: "2 1 130px" }}>
               ZIP code
               <input value={zip} inputMode="numeric" placeholder="e.g. 80401"
                 onChange={(e) => setZip(e.target.value.replace(/\D/g, "").slice(0, 5))}
                 onKeyDown={(e) => { if (e.key === "Enter") runEnvFetch(); }}
                 style={envFieldInput} />
             </label>
-            <label style={{ ...envFieldLabel, flex: "1 1 140px" }}>
+            <label style={{ ...envFieldLabel, flex: "2 1 150px" }}>
               Date
               <input type="date" value={envDate} onChange={(e) => setEnvDate(e.target.value)} style={envFieldInput} />
-            </label>
-            <label style={{ ...envFieldLabel, flex: "1 1 120px" }}>
-              Room temp
-              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <input type="number" value={roomTempF} min={40} max={110}
-                  onChange={(e) => setRoomTempF(e.target.value)} style={{ ...envFieldInput, width: "100%" }} />
-                <span style={{ fontFamily: mono, fontSize: 12, color: C.inkSoft, whiteSpace: "nowrap" }}>°F · {round((rt - 32) * 5 / 9)}°C</span>
-              </span>
             </label>
             <button onClick={runEnvFetch} disabled={envLoading}
               style={{ fontFamily: mono, fontSize: 13, fontWeight: 600, padding: "10px 16px", borderRadius: 9, border: "none", cursor: envLoading ? "default" : "pointer", background: C.oliveDeep, color: C.onAccent, opacity: envLoading ? 0.6 : 1, whiteSpace: "nowrap" }}>
@@ -1057,14 +1074,46 @@ export default function FocacciaBuildSheet() {
             </button>
           </div>
 
+          {/* Manual conditions: room temperature (°F/°C) + humidity override */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end", marginTop: 10 }}>
+            <label style={{ ...envFieldLabel, flex: "3 1 280px" }}>
+              Room temperature
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input type="number" value={roomTempInput} inputMode="decimal"
+                  onChange={(e) => setRoomTempInput(e.target.value)}
+                  style={{ ...envFieldInput, flex: 1, minWidth: 90 }} />
+                <div style={{ display: "flex", gap: 3, background: C.paperDeep, borderRadius: 8, padding: 3 }}>
+                  {["F", "C"].map((u) => {
+                    const on = tempUnit === u;
+                    return (
+                      <button key={u} type="button" onClick={() => switchTempUnit(u)}
+                        style={{ border: "none", borderRadius: 6, padding: "7px 11px", cursor: "pointer", fontFamily: mono, fontSize: 12, fontWeight: 600, background: on ? C.olive : "transparent", color: on ? C.onAccent : C.inkSoft, transition: "all .15s ease" }}>°{u}</button>
+                    );
+                  })}
+                </div>
+                <span style={{ fontFamily: mono, fontSize: 12, color: C.inkSoft, whiteSpace: "nowrap" }}>≈ {rtAltUnit}°{tempUnit === "F" ? "C" : "F"}</span>
+              </span>
+            </label>
+            <label style={{ ...envFieldLabel, flex: "2 1 160px" }}>
+              Humidity %
+              <input type="number" value={humidityManual} min={0} max={100} inputMode="decimal"
+                placeholder={envData ? `${envData.humidityPct} (fetched)` : "optional"}
+                onChange={(e) => setHumidityManual(e.target.value)} style={envFieldInput} />
+            </label>
+          </div>
+
+          <div style={{ marginTop: 9, fontSize: 12, color: C.inkSoft, fontStyle: "italic" }}>
+            Humidity uses the ZIP/day reading unless you enter your own — set it to your hygrometer value if a humidifier or HVAC makes your kitchen differ.{!envData ? " Add a ZIP and fetch for altitude effects." : ""}
+          </div>
+
           {envError && (
             <div style={{ marginTop: 11, fontSize: 13, color: C.rust, fontWeight: 600 }}>⚠ {envError}</div>
           )}
 
-          {envData && envAdj && (
+          {condReady && envAdj && (
             <div style={{ marginTop: 14, background: C.brineBg, border: `1.5px solid ${C.rust}`, borderRadius: 12, padding: "13px 15px", animation: "riseIn .2s ease" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 11 }}>
-                <span style={{ fontSize: 14.5, fontWeight: 600 }}>📍 {envData.place} · {envData.date}</span>
+                <span style={{ fontSize: 14.5, fontWeight: 600 }}>📍 {envData ? `${envData.place} · ${envData.date}` : "Your kitchen · manual conditions"}</span>
                 <button onClick={() => setEnvApplied((a) => !a)} disabled={!!special}
                   style={{ display: "flex", alignItems: "center", gap: 8, background: envOn ? C.rust : "transparent", color: envOn ? C.onAccent : C.rust, border: `1.5px solid ${C.rust}`, borderRadius: 20, padding: "6px 13px", cursor: special ? "default" : "pointer", opacity: special ? 0.5 : 1, fontFamily: mono, fontSize: 12, fontWeight: 600 }}>
                   {envOn ? "✓ applied to recipe" : envApplied && special ? "n/a for fixed recipe" : "apply to recipe"}
@@ -1072,9 +1121,9 @@ export default function FocacciaBuildSheet() {
               </div>
 
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-                {envStat("Elevation", `${envData.elevFt.toLocaleString()} ft`)}
-                {envStat("Humidity", `${envData.humidityPct}%`)}
-                {envStat("Room", `${rt}°F`)}
+                {envStat("Elevation", envData ? `${envData.elevFt.toLocaleString()} ft` : "— add ZIP")}
+                {envStat(humidityIsManual ? "Humidity · yours" : "Humidity", `${humidityUsed}%`)}
+                {envStat("Room", `${round(rt)}°F · ${round((rt - 32) * 5 / 9)}°C`)}
               </div>
 
               <div style={{ fontFamily: mono, fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: C.rust, fontWeight: 600, marginBottom: 9 }}>
@@ -1086,19 +1135,19 @@ export default function FocacciaBuildSheet() {
                     label: "Hydration",
                     value: `${hydration}% → ${round(clamp(hydration + envAdj.hydrationDelta, 55, 100), 1)}%`,
                     on: envOn,
-                    why: `${envData.humidityPct < ENV_BASE_RH ? "Dry air" : "Humid air"} (${envData.humidityPct}% RH vs ${ENV_BASE_RH}% baseline) shifts water ${envAdj.hydrationFromRH >= 0 ? "+" : ""}${round(envAdj.hydrationFromRH, 1)}%${envAdj.hydrationFromAlt > 0 ? `, altitude adds +${round(envAdj.hydrationFromAlt, 1)}% (drier, faster-evaporating air)` : ""}.`,
+                    why: `${humidityUsed < ENV_BASE_RH ? "Dry air" : "Humid air"} (${humidityUsed}% RH${humidityIsManual ? ", your reading" : ""} vs ${ENV_BASE_RH}% baseline) shifts water ${envAdj.hydrationFromRH >= 0 ? "+" : ""}${round(envAdj.hydrationFromRH, 1)}%${envAdj.hydrationFromAlt > 0 ? `, altitude adds +${round(envAdj.hydrationFromAlt, 1)}% (drier, faster-evaporating air)` : ""}.`,
                   }] : []),
                   ...(envAdj.yeastFactor < 1 ? [{
                     label: "Yeast",
                     value: `×${envAdj.yeastFactor.toFixed(2)} (−${round((1 - envAdj.yeastFactor) * 100)}%)`,
                     on: envOn,
-                    why: `At ${envData.elevFt.toLocaleString()} ft the lower air pressure lets fermentation gas expand more, so dough over-proofs — trim the yeast and watch the dough, not the clock.`,
+                    why: `At ${elevFtUsed.toLocaleString()} ft the lower air pressure lets fermentation gas expand more, so dough over-proofs — trim the yeast and watch the dough, not the clock.`,
                   }] : []),
                   {
                     label: "Mixing-water temp",
                     value: `${envAdj.waterTempF}°F`,
                     on: true,
-                    why: `Desired-dough-temperature method: to hit ~${ENV_DDT_F}°F dough at a ${rt}°F room (hand-mixed), start with water near this temperature.`,
+                    why: `Desired-dough-temperature method: to hit ~${ENV_DDT_F}°F dough at a ${round(rt)}°F room (hand-mixed), start with water near this temperature.`,
                   },
                   ...(envAdj.bakeTempBumpF > 0 ? [{
                     label: "Bake",
@@ -1110,7 +1159,7 @@ export default function FocacciaBuildSheet() {
                     label: "Ferment pace",
                     value: envAdj.fermentFactor < 1 ? `~${round((1 - envAdj.fermentFactor) * 100)}% faster` : envAdj.fermentFactor > 1 ? `~${round((envAdj.fermentFactor - 1) * 100)}% longer` : "as scheduled",
                     on: true,
-                    why: `Yeast activity roughly doubles per ~18°F (Q10≈2). Your ${rt}°F room runs ${envAdj.fermentFactor < 1 ? "warmer than" : envAdj.fermentFactor > 1 ? "cooler than" : "right at"} the schedule's ${ENV_FERMENT_REF_F}°F assumption, so expect the bulk and proof to take ${envAdj.fermentFactor < 1 ? "less" : "more"} time.`,
+                    why: `Yeast activity roughly doubles per ~18°F (Q10≈2). Your ${round(rt)}°F room runs ${envAdj.fermentFactor < 1 ? "warmer than" : envAdj.fermentFactor > 1 ? "cooler than" : "right at"} the schedule's ${ENV_FERMENT_REF_F}°F assumption, so expect the bulk and proof to take ${envAdj.fermentFactor < 1 ? "less" : "more"} time.`,
                   },
                 ].map((ln) => (
                   <div key={ln.label} style={{ opacity: ln.on ? 1 : 0.5 }}>
@@ -1148,7 +1197,7 @@ export default function FocacciaBuildSheet() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: C.rust, fontWeight: 600, margin: "4px 2px 10px" }}>
           <span>The dials</span>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 10, marginBottom: 12 }}>
           <Dial label="Crumb — hydration" value={hydration} min={65} max={90} step={1}
             onChange={setHydration} readout={envOn && envAdj.hydrationDelta !== 0 ? `${hydration}% → ${hydrationAdj}% · ${round(v.water)}g` : `${hydration}% · ${round(v.water)}g`} lo="tight / bread-y" hi="open / custardy"
             why="Water as a % of flour. Gluten forms from hydration plus kneading energy (Cauvain, Ch.2), and more water gives larger, more irregular holes and a moist, custardy crumb — at the cost of a slacker, wetter-to-handle dough. Below ~70% it bakes tighter and more sandwich-bread-like." />
@@ -1301,7 +1350,7 @@ export default function FocacciaBuildSheet() {
         </>}
 
         {/* Display options: verbosity + dark mode */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 10, marginBottom: 12 }}>
           <div style={{ background: C.card, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "13px 15px 11px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <span style={{ fontSize: 15, fontWeight: 600 }}>Recipe detail</span>
