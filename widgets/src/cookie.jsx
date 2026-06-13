@@ -803,7 +803,9 @@ export default function CookieBuildSheet() {
   // kitchen environment (altitude + humidity for a ZIP/day, plus room temp)
   const [zip, setZip] = useState("");
   const [envDate, setEnvDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [roomTempF, setRoomTempF] = useState(72);
+  const [roomTempInput, setRoomTempInput] = useState("72"); // value as typed, in `tempUnit`
+  const [tempUnit, setTempUnit] = useState("F");            // 'F' | 'C'
+  const [humidityManual, setHumidityManual] = useState(""); // blank = use the fetched value
   const [envData, setEnvData] = useState(null);     // { place, elevFt, elevM, humidityPct, date }
   const [envLoading, setEnvLoading] = useState(false);
   const [envError, setEnvError] = useState("");
@@ -840,16 +842,28 @@ export default function CookieBuildSheet() {
   const effFlour = f - cocoaLoad;                 // the flour left to build structure
   const cocoa = { on: cocoaOn, mode: cocoaMode, pct: cocoaPct, load: cocoaLoad, effFlour };
 
-  // Kitchen-environment recalibration. Altitude trims the leavening and sugar
-  // (folded into the live recipe once data is fetched and "apply" is on, never
-  // over a fixed recipe); the oven bump, chill and butter-temperature advice
-  // are guidance the room temp and humidity always drive.
-  const rt = clamp(Number(roomTempF) || 70, 40, 110);
+  // Kitchen-environment recalibration. Room temperature is entered in °F or °C
+  // (converted to °F for the science). Humidity comes from the ZIP/day fetch but
+  // a manual entry overrides it — useful when a humidifier or HVAC makes the
+  // indoor air differ from outdoors. Altitude trims the leavening and sugar
+  // (folded into the live recipe once we have a humidity figure and "apply" is
+  // on, never over a fixed recipe); the oven bump, chill and butter-temperature
+  // advice are guidance the room temp and humidity always drive. Altitude needs
+  // a fetched elevation; without one it's treated as sea level.
+  const rtRaw = Number(roomTempInput);
+  const rtF = tempUnit === "C" ? rtRaw * 9 / 5 + 32 : rtRaw;
+  const rt = clamp(Number.isFinite(rtF) ? rtF : 70, 40, 110);
+  const rtAltUnit = tempUnit === "F" ? round((rt - 32) * 5 / 9, 1) : round(rt, 1); // the other-unit readout
+  const humidityUsed = humidityManual.trim() !== "" ? clamp(Number(humidityManual) || 0, 0, 100)
+    : (envData ? envData.humidityPct : null);
+  const humidityIsManual = humidityManual.trim() !== "";
+  const elevFtUsed = envData ? envData.elevFt : 0;
+  const condReady = humidityUsed != null;
   const envAdj = useMemo(
-    () => (envData ? computeEnvAdjust({ elevFt: envData.elevFt, humidityPct: envData.humidityPct, roomTempF: rt }) : null),
-    [envData, rt]
+    () => (condReady ? computeEnvAdjust({ elevFt: elevFtUsed, humidityPct: humidityUsed, roomTempF: rt }) : null),
+    [condReady, elevFtUsed, humidityUsed, rt]
   );
-  const envOn = !!(envData && envApplied && !special);
+  const envOn = !!(condReady && envApplied && !special);
   const sugarPctEff = Math.max(0, round(sugarPct + (envOn ? envAdj.sugarDeltaPct : 0), 1));
   const leavenEnvFactor = envOn ? envAdj.leavenFactor : 1;
 
@@ -864,6 +878,17 @@ export default function CookieBuildSheet() {
     } finally {
       setEnvLoading(false);
     }
+  }
+  // Switch the room-temp unit, converting the entered value so it stays the
+  // same physical temperature.
+  function switchTempUnit(u) {
+    if (u === tempUnit) return;
+    const n = Number(roomTempInput);
+    if (Number.isFinite(n) && roomTempInput.trim() !== "") {
+      const conv = u === "C" ? (n - 32) * 5 / 9 : n * 9 / 5 + 32;
+      setRoomTempInput(String(round(conv, 1)));
+    }
+    setTempUnit(u);
   }
 
   const v = useMemo(() => {
@@ -957,7 +982,7 @@ export default function CookieBuildSheet() {
     <ThemeCtx.Provider value={C}>
     <div style={{ background: C.paper, minHeight: "100vh", padding: "28px 16px 60px", fontFamily: "'Fraunces', serif", color: C.ink, colorScheme: dark ? "dark" : "light", backgroundImage: C.glow, transition: "background .25s ease, color .25s ease" }}>
       <style>{FONTS}</style>
-      <div style={{ maxWidth: 720, margin: "0 auto", animation: "riseIn .5s ease" }}>
+      <div style={{ width: "100%", maxWidth: 880, margin: "0 auto", animation: "riseIn .5s ease" }}>
         {/* Header */}
         <div style={{ borderBottom: `2px solid ${C.ink}`, paddingBottom: 14, marginBottom: 18, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 8 }}>
           <h1 style={{ margin: 0, fontSize: 40, fontWeight: 900, letterSpacing: -1, lineHeight: 0.95 }}>Cookies</h1>
@@ -1059,28 +1084,21 @@ export default function CookieBuildSheet() {
             <span style={{ fontFamily: mono, fontSize: 11, color: C.inkSoft }}>altitude · humidity · room temp</span>
           </div>
           <div style={{ fontSize: 13, color: C.inkSoft, fontStyle: "italic", marginBottom: 13 }}>
-            Pull your elevation and the day's humidity from a US ZIP code, add the room temperature, and the formula recalibrates — leavening, sugar, the bake and how much to chill.
+            Pull your elevation and the day's humidity from a US ZIP code (or type your own indoor humidity), set the room temperature in °F or °C, and the formula recalibrates — leavening, sugar, the bake and how much to chill.
           </div>
 
+          {/* Location → fetch */}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-            <label style={{ ...envFieldLabel, flex: "1 1 120px" }}>
+            <label style={{ ...envFieldLabel, flex: "2 1 130px" }}>
               ZIP code
               <input value={zip} inputMode="numeric" placeholder="e.g. 80401"
                 onChange={(e) => setZip(e.target.value.replace(/\D/g, "").slice(0, 5))}
                 onKeyDown={(e) => { if (e.key === "Enter") runEnvFetch(); }}
                 style={envFieldInput} />
             </label>
-            <label style={{ ...envFieldLabel, flex: "1 1 140px" }}>
+            <label style={{ ...envFieldLabel, flex: "2 1 150px" }}>
               Date
               <input type="date" value={envDate} onChange={(e) => setEnvDate(e.target.value)} style={envFieldInput} />
-            </label>
-            <label style={{ ...envFieldLabel, flex: "1 1 120px" }}>
-              Room temp
-              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <input type="number" value={roomTempF} min={40} max={110}
-                  onChange={(e) => setRoomTempF(e.target.value)} style={{ ...envFieldInput, width: "100%" }} />
-                <span style={{ fontFamily: mono, fontSize: 12, color: C.inkSoft, whiteSpace: "nowrap" }}>°F · {round((rt - 32) * 5 / 9)}°C</span>
-              </span>
             </label>
             <button onClick={runEnvFetch} disabled={envLoading}
               style={{ fontFamily: mono, fontSize: 13, fontWeight: 600, padding: "10px 16px", borderRadius: 9, border: "none", cursor: envLoading ? "default" : "pointer", background: C.butterDeep, color: C.onAccent, opacity: envLoading ? 0.6 : 1, whiteSpace: "nowrap" }}>
@@ -1088,14 +1106,46 @@ export default function CookieBuildSheet() {
             </button>
           </div>
 
+          {/* Manual conditions: room temperature (°F/°C) + humidity override */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end", marginTop: 10 }}>
+            <label style={{ ...envFieldLabel, flex: "3 1 280px" }}>
+              Room temperature
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input type="number" value={roomTempInput} inputMode="decimal"
+                  onChange={(e) => setRoomTempInput(e.target.value)}
+                  style={{ ...envFieldInput, flex: 1, minWidth: 90 }} />
+                <div style={{ display: "flex", gap: 3, background: C.paperDeep, borderRadius: 8, padding: 3 }}>
+                  {["F", "C"].map((u) => {
+                    const on = tempUnit === u;
+                    return (
+                      <button key={u} type="button" onClick={() => switchTempUnit(u)}
+                        style={{ border: "none", borderRadius: 6, padding: "7px 11px", cursor: "pointer", fontFamily: mono, fontSize: 12, fontWeight: 600, background: on ? C.butter : "transparent", color: on ? C.onAccent : C.inkSoft, transition: "all .15s ease" }}>°{u}</button>
+                    );
+                  })}
+                </div>
+                <span style={{ fontFamily: mono, fontSize: 12, color: C.inkSoft, whiteSpace: "nowrap" }}>≈ {rtAltUnit}°{tempUnit === "F" ? "C" : "F"}</span>
+              </span>
+            </label>
+            <label style={{ ...envFieldLabel, flex: "2 1 160px" }}>
+              Humidity %
+              <input type="number" value={humidityManual} min={0} max={100} inputMode="decimal"
+                placeholder={envData ? `${envData.humidityPct} (fetched)` : "optional"}
+                onChange={(e) => setHumidityManual(e.target.value)} style={envFieldInput} />
+            </label>
+          </div>
+
+          <div style={{ marginTop: 9, fontSize: 12, color: C.inkSoft, fontStyle: "italic" }}>
+            Humidity uses the ZIP/day reading unless you enter your own — set it to your hygrometer value if a humidifier or HVAC makes your kitchen differ.{!envData ? " Add a ZIP and fetch for altitude effects." : ""}
+          </div>
+
           {envError && (
             <div style={{ marginTop: 11, fontSize: 13, color: C.choc, fontWeight: 600 }}>⚠ {envError}</div>
           )}
 
-          {envData && envAdj && (
+          {condReady && envAdj && (
             <div style={{ marginTop: 14, background: C.mixBg, border: `1.5px solid ${C.choc}`, borderRadius: 12, padding: "13px 15px", animation: "riseIn .2s ease" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 11 }}>
-                <span style={{ fontSize: 14.5, fontWeight: 600 }}>📍 {envData.place} · {envData.date}</span>
+                <span style={{ fontSize: 14.5, fontWeight: 600 }}>📍 {envData ? `${envData.place} · ${envData.date}` : "Your kitchen · manual conditions"}</span>
                 <button onClick={() => setEnvApplied((a) => !a)} disabled={!!special}
                   style={{ display: "flex", alignItems: "center", gap: 8, background: envOn ? C.choc : "transparent", color: envOn ? C.onAccent : C.choc, border: `1.5px solid ${C.choc}`, borderRadius: 20, padding: "6px 13px", cursor: special ? "default" : "pointer", opacity: special ? 0.5 : 1, fontFamily: mono, fontSize: 12, fontWeight: 600 }}>
                   {envOn ? "✓ applied to recipe" : envApplied && special ? "n/a for fixed recipe" : "apply to recipe"}
@@ -1103,9 +1153,9 @@ export default function CookieBuildSheet() {
               </div>
 
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-                {envStat("Elevation", `${envData.elevFt.toLocaleString()} ft`)}
-                {envStat("Humidity", `${envData.humidityPct}%`)}
-                {envStat("Room", `${rt}°F`)}
+                {envStat("Elevation", envData ? `${envData.elevFt.toLocaleString()} ft` : "— add ZIP")}
+                {envStat(humidityIsManual ? "Humidity · yours" : "Humidity", `${humidityUsed}%`)}
+                {envStat("Room", `${round(rt)}°F · ${round((rt - 32) * 5 / 9)}°C`)}
               </div>
 
               <div style={{ fontFamily: mono, fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: C.choc, fontWeight: 600, marginBottom: 9 }}>
@@ -1117,7 +1167,7 @@ export default function CookieBuildSheet() {
                     label: "Leavening",
                     value: `×${envAdj.leavenFactor.toFixed(2)} (−${round((1 - envAdj.leavenFactor) * 100)}%)`,
                     on: envOn,
-                    why: `At ${envData.elevFt.toLocaleString()} ft the lower air pressure lets the soda/powder's gas expand more, so cookies dome then collapse — cut the leavening so they set flat and even.`,
+                    why: `At ${elevFtUsed.toLocaleString()} ft the lower air pressure lets the soda/powder's gas expand more, so cookies dome then collapse — cut the leavening so they set flat and even.`,
                   }] : []),
                   ...(envAdj.sugarDeltaPct !== 0 ? [{
                     label: "Sugar",
@@ -1136,14 +1186,14 @@ export default function CookieBuildSheet() {
                     value: envAdj.recommendChill ? "recommended (≥1 hr)" : "optional",
                     on: true,
                     why: envAdj.recommendChill
-                      ? `Your ${rt}°F room${envData.humidityPct > ENV_BASE_RH ? ` and ${envData.humidityPct}% humidity` : ""} means soft butter and a slack, hygroscopic dough — both push the cookie to over-spread. Chilling firms the fat so it holds its shape.`
-                      : `Your ${rt}°F room and ${envData.humidityPct}% humidity are in the comfortable range — chilling is about flavour and shape, not damage control here.`,
+                      ? `Your ${round(rt)}°F room${humidityUsed > ENV_BASE_RH ? ` and ${humidityUsed}% humidity` : ""} means soft butter and a slack, hygroscopic dough — both push the cookie to over-spread. Chilling firms the fat so it holds its shape.`
+                      : `Your ${round(rt)}°F room and ${humidityUsed}% humidity are in the comfortable range — chilling is about flavour and shape, not damage control here.`,
                   },
                   {
                     label: "Butter / dough temp",
                     value: `${envAdj.spreadRisk} spread risk`,
                     on: true,
-                    why: `Spread is governed by how soft the butter is when it hits the oven. At ${rt}°F your butter runs ${rt >= 75 ? "soft — cream it just to combine (not fluffy), or chill the scooped dough" : rt <= 62 ? "firm — let it warm a little before creaming so it aerates" : "about right for creaming"}.`,
+                    why: `Spread is governed by how soft the butter is when it hits the oven. At ${round(rt)}°F your butter runs ${rt >= 75 ? "soft — cream it just to combine (not fluffy), or chill the scooped dough" : rt <= 62 ? "firm — let it warm a little before creaming so it aerates" : "about right for creaming"}.`,
                   },
                 ].map((ln) => (
                   <div key={ln.label} style={{ opacity: ln.on ? 1 : 0.5 }}>
@@ -1181,7 +1231,7 @@ export default function CookieBuildSheet() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: C.choc, fontWeight: 600, margin: "4px 2px 10px" }}>
           <span>The dials</span>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 10, marginBottom: 12 }}>
           <Dial label="Sugar — total" value={sugarPct} min={45} max={120} step={5}
             onChange={setSugarPct} readout={envOn && envAdj.sugarDeltaPct !== 0 ? `${sugarPct}% → ${sugarPctEff}% · ${round(v.totalSugar)}g` : `${sugarPct}% · ${round(v.totalSugar)}g`} lo="lean / less sweet" hi="rich / candy-sweet"
             why="Sugar as a % of flour. Sugar does far more than sweeten: it melts and dissolves in the heat so the dough flows — more sugar means more spread and a crisper, more caramelized cookie. It also tenderises (competing for water, it interferes with gluten and slows egg set) and fuels browning (McGee; Bressanini, zuccheri)." />
@@ -1334,7 +1384,7 @@ export default function CookieBuildSheet() {
         </>}
 
         {/* Display options: verbosity + dark mode */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 10, marginBottom: 12 }}>
           <div style={{ background: C.card, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "13px 15px 11px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <span style={{ fontSize: 15, fontWeight: 600 }}>Recipe detail</span>
