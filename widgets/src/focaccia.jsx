@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useContext, useEffect } from "react";
 import { QUALITY_AXES, qualities, solveWithin, solveConforming, IDENTITY_KEYS } from "./src/focaccia-model.js";
+const goldmemberImg = "/static/goldmember.png"; // served from quartz/static (blog easter egg)
 
 // ============================================================================
 // Focaccia Dashboard — drive the *qualities* (open crumb, tang, flake, fried
@@ -104,7 +105,7 @@ const SCHEDULES = [
 // honestly rather than faked with the dials.
 const STYLES = [
   // ---- The house ----
-  { id: "flaky", cat: "The house", name: "Flaky (hot-rod)", tag: "laminated · fried",
+  { id: "flaky", cat: "The house", name: "Flaky (thatsch a keeper)", tag: "laminated · fried",
     blurb: "The house build: a 3-day cold ferment, oiled lamination folds for a shreddy pull, and a deep pan-fry. Dough kept lean so the fat works the layers and the base, not the crumb.",
     set: { hydration: 82, schIdx: 3, folds: 3, panOilPct: 10, doughOilPct: 0, saltPct: 2.4, semolinaPct: 5, twoPans: true } },
   { id: "sameday", cat: "The house", name: "Same-day", tag: "weeknight",
@@ -1048,11 +1049,19 @@ export default function FocacciaBuildSheet() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
                 {STYLES.filter((s) => s.cat === cat).map((s) => {
                   const on = !special && boundStyle === s.id;
+                  // Easter egg: the house "Flaky" tile, when selected, fills with
+                  // Goldmember (a dark wash keeps the label legible). That'sch a keeper.
+                  const goldOn = s.id === "flaky" && on;
                   return (
                     <button key={s.id} onClick={() => applyStyle(s.id)} style={{
                       display: "flex", gap: 9, alignItems: "flex-start", textAlign: "left", cursor: "pointer",
                       borderRadius: 11, padding: "11px 12px", transition: "all .15s ease", fontFamily: "'Fraunces', serif",
-                      border: `1.5px solid ${on ? C.olive : C.line}`, background: on ? C.olive : C.card, color: on ? C.onAccent : C.ink }}>
+                      border: `1.5px solid ${on ? C.olive : C.line}`,
+                      background: goldOn
+                        ? `linear-gradient(rgba(0,0,0,0.32), rgba(0,0,0,0.42)), ${C.olive} url(${goldmemberImg}) center / cover no-repeat`
+                        : on ? C.olive : C.card,
+                      color: on ? C.onAccent : C.ink,
+                      textShadow: goldOn ? "0 1px 3px rgba(0,0,0,0.9)" : "none" }}>
                       <span style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${on ? C.onAccent : C.line}`, flexShrink: 0, marginTop: 2, position: "relative" }}>
                         {on && <span style={{ position: "absolute", inset: 2.5, borderRadius: "50%", background: C.onAccent }} />}
                       </span>
