@@ -7,13 +7,14 @@ The two widgets use **different** setups right now:
 
 **focaccia** — sourced from the standalone `foccaciabot` repo as a git dependency
 (`focaccia-widget` = `github:4AM365/foccaciabot#master`). `widgets/src/focaccia.jsx`
-is a one-line re-export shim; there is **no copy**. To ship a focaccia change:
+is a one-line re-export shim; there is **no copy**. The model-equations page at
+`content/kitchen/focaccia-model.md` is a synced copy of foccaciabot's canonical
+`docs/focaccia-model.md`. To ship a focaccia change, run the pipeline from the
+foccaciabot repo — it does both repos end to end:
 ```
-# in playground/foccaciabot: edit, commit, push
-cd ventures/4AM365.github.io
-npm update focaccia-widget        # pull the new commit
-npm run build:widgets             # rebundle quartz/static/widgets/focaccia.js
-git commit -am ... && git push    # push auto-deploys
+cd playground/foccaciabot
+npm run publish:blog -- "your change"   # commits+pushes foccaciabot, then rebuilds
+                                        # the widget + syncs the doc here, commits, pushes
 ```
 
 **cookie** — still a **verbatim copy** of the playground build sheet, model
