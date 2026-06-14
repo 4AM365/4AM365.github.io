@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useContext } from "react";
+import React, { useState, useMemo, useContext, useEffect } from "react";
 
 // ============================================================================
 // Cookie Dashboard — drive the *qualities* (spread, chew vs. crisp vs. cakey,
@@ -18,6 +18,30 @@ const FONTS = `
 @keyframes riseIn { from { opacity:0; transform: translateY(10px);} to {opacity:1; transform:none;} }
 `;
 
+// GeoCities skin stylesheet — injected only when the page is in the geocities
+// vibe. !important so it overrides the hardcoded inline fonts/borders.
+const GEO_CSS = `
+@keyframes geoBlink { 50% { opacity: 0; } }
+@keyframes geoRainbow { 0%{color:#ff0040} 20%{color:#ff8c00} 40%{color:#ffe000} 60%{color:#00c853} 80%{color:#2962ff} 100%{color:#aa00ff} }
+.geocities, .geocities * { font-family: "Comic Sans MS","Comic Sans","Chalkboard SE",cursive !important; }
+.geocities .geo-counter, .geocities .geo-counter * { font-family: "Courier New", monospace !important; }
+.geocities button { border-style: outset !important; }
+.geocities { background-repeat: repeat !important; }
+.geocities.geo-dark { background-image:
+  radial-gradient(1.5px 1.5px at 20px 24px,#ffffff,transparent),
+  radial-gradient(1px 1px at 64px 52px,#aaeeff,transparent),
+  radial-gradient(1.5px 1.5px at 120px 88px,#ffffff,transparent),
+  radial-gradient(1px 1px at 150px 30px,#ffd0d0,transparent) !important;
+  background-size: 180px 130px !important; }
+.geocities.geo-light { background-image:
+  radial-gradient(3px 3px at 22px 24px,rgba(255,0,255,0.20),transparent),
+  radial-gradient(3px 3px at 92px 70px,rgba(0,0,238,0.16),transparent),
+  radial-gradient(3px 3px at 150px 34px,rgba(255,140,0,0.18),transparent) !important;
+  background-size: 175px 120px !important; }
+.geo-blink { animation: geoBlink 1.1s steps(1) infinite; }
+.geo-rainbow { animation: geoRainbow 5s linear infinite; font-weight: 900; }
+`;
+
 // ---- Theming ---------------------------------------------------------------
 // Warm bakery palette. Same keys in both themes. `onAccent` is light in BOTH —
 // it's the text/icon colour placed on butter/butterDeep/choc accent surfaces.
@@ -35,6 +59,38 @@ const THEMES = {
     line: "#3c3122", card: "#241a0e", onAccent: "#fbf3e4",
     glow: "radial-gradient(circle at 20% 10%, rgba(224,138,90,0.10), transparent 42%), radial-gradient(circle at 85% 0%, rgba(224,164,74,0.10), transparent 45%)",
     mixBg: "rgba(224,138,90,0.10)",
+  },
+  // GeoCities skin — clashing 1998 palette (maps the cookie accent keys). The
+  // tiled background / Comic Sans / blink live in GEO_CSS, injected when active.
+  geoLight: {
+    paper: "#cfcfee", paperDeep: "#bcbce4", ink: "#000000", inkSoft: "#000080",
+    butter: "#ff00ff", butterDeep: "#c800c8", choc: "#0000ee", bake: "#ff6a00",
+    line: "#808080", card: "#ffffcc", onAccent: "#ffffff",
+    glow: "none",
+    mixBg: "rgba(255,0,255,0.10)",
+  },
+  geoDark: {
+    paper: "#000018", paperDeep: "#000010", ink: "#00ff66", inkSoft: "#33ccff",
+    butter: "#ff00ff", butterDeep: "#aa00aa", choc: "#ffe000", bake: "#ff8c00",
+    line: "#5454aa", card: "#0a0a30", onAccent: "#ffffff",
+    glow: "none",
+    mixBg: "rgba(255,224,0,0.10)",
+  },
+  // JDM — matches the blog's default vibe (white / purple) so the widget stays
+  // coherent under it. Mapped from quartz.config.ts.
+  jdmLight: {
+    paper: "#ffffff", paperDeep: "#ece9f5", ink: "#1a1730", inkSoft: "#6b6688",
+    butter: "#6d28d9", butterDeep: "#5b21b6", choc: "#7c3aed", bake: "#a78bfa",
+    line: "#d8d3ea", card: "#faf9fd", onAccent: "#ffffff",
+    glow: "radial-gradient(circle at 20% 10%, rgba(109,40,217,0.05), transparent 40%), radial-gradient(circle at 85% 0%, rgba(167,139,250,0.06), transparent 45%)",
+    mixBg: "rgba(109,40,217,0.07)",
+  },
+  jdmDark: {
+    paper: "#14101e", paperDeep: "#26213a", ink: "#f5f3fc", inkSoft: "#9b95b5",
+    butter: "#a78bfa", butterDeep: "#7c3aed", choc: "#c084fc", bake: "#c084fc",
+    line: "#3a3358", card: "#1e1830", onAccent: "#14101e",
+    glow: "radial-gradient(circle at 20% 10%, rgba(167,139,250,0.10), transparent 42%), radial-gradient(circle at 85% 0%, rgba(192,132,252,0.10), transparent 45%)",
+    mixBg: "rgba(167,139,250,0.10)",
   },
 };
 const ThemeCtx = React.createContext(THEMES.light);
@@ -465,7 +521,6 @@ const ADDIN_PLAN = {
   sprinkles: { phase: "shape", do: "Roll the dough balls in sprinkles" },
 };
 
-const VERBOSITY = ["Terse", "Standard", "Detailed"];
 
 // Cocoa swaps 1:1 for flour. Natural cocoa is acidic (pairs with baking soda);
 // Dutched is alkalised and pH-neutral (pairs with baking powder).
@@ -537,11 +592,12 @@ function Dial({ label, value, min, max, step, onChange, readout, lo, hi, stops, 
 
 // ---------------------------------------------------------------------------
 // Process generator — steps adapt to method, chill, leavening, flour, add-ins,
-// cocoa, oven temp, scoop and verbosity. `more` is surfaced only at Detailed.
+// cocoa, oven temp and scoop. Each step's spec shows as bullets; `why` + `more`
+// reveal on tap.
 // ---------------------------------------------------------------------------
 function buildSteps(p) {
   const { method, eggForm, leaven, sugarPct, brownPct, butterPct, eggPct,
-    flour, chill, chillIdx, sodaShare, ovenF, scoop, addins, cocoa, verbosity } = p;
+    flour, chill, chillIdx, sodaShare, ovenF, scoop, addins, cocoa } = p;
   const ovenC = fToC(ovenF);
   const sc = SCOOPS[scoop];
   const eg = EGG_FORMS[eggForm];
@@ -596,7 +652,7 @@ function buildSteps(p) {
   }
 
   if (folded.length) {
-    const lines = folded.map((t) => `${t.icon} ${t.label} — ${verbosity >= 2 ? t.prep : t.short}`).join("\n");
+    const lines = folded.map((t) => `${t.icon} ${t.label} — ${t.prep}`).join("\n");
     steps.push({ title: "Fold in the add-ins", spec: folded.map((t) => t.label).join(" · "),
       why: lines,
       more: "Fold by hand just to distribute — overmixing now both toughens the dough and smears the chocolate. Reserve a few chips/nuts to press onto the tops." });
@@ -796,10 +852,25 @@ export default function CookieBuildSheet() {
   const [cocoaMode, setCocoaMode] = useState("natural"); // natural | dutch
   const [cocoaPct, setCocoaPct] = useState(25);           // cocoa as % of flour
   const [prepDone, setPrepDone] = useState({});           // mise-en-place checklist
-  const [verbosity, setVerbosity] = useState(1);
-  const [dark, setDark] = useState(false);
+  // Light/dark inherits from the host Quartz blog (`saved-theme` on <html>); standalone → light.
+  const [dark, setDark] = useState(() => {
+    try { return document.documentElement.getAttribute("saved-theme") === "dark"; } catch { return false; }
+  });
+  // Vibe (skin) inherits from the page's `saved-vibe` (jdm | modern | geocities); standalone → jdm.
+  const [vibe, setVibe] = useState(() => {
+    try { return document.documentElement.getAttribute("saved-vibe") || "jdm"; } catch { return "jdm"; }
+  });
   const [openStep, setOpenStep] = useState("01");
   const [special, setSpecial] = useState(null);           // a fixed recipe, or null
+
+  // Follow the blog's light/dark + vibe switchers live when embedded there.
+  useEffect(() => {
+    const onTheme = (e) => { if (e && e.detail && e.detail.theme) setDark(e.detail.theme === "dark"); };
+    const onVibe = (e) => { if (e && e.detail && e.detail.vibe) setVibe(e.detail.vibe); };
+    document.addEventListener("themechange", onTheme);
+    document.addEventListener("vibechange", onVibe);
+    return () => { document.removeEventListener("themechange", onTheme); document.removeEventListener("vibechange", onVibe); };
+  }, []);
   // kitchen environment (altitude + humidity for a ZIP/day, plus room temp)
   const [zip, setZip] = useState("");
   const [envDate, setEnvDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -811,7 +882,12 @@ export default function CookieBuildSheet() {
   const [envError, setEnvError] = useState("");
   const [envApplied, setEnvApplied] = useState(true); // fold the recalibration into the recipe
 
-  const C = dark ? THEMES.dark : THEMES.light;
+  // Inherit the page's vibe + brightness → palette. `geocities` also drives the
+  // retro banner + GEO_CSS below.
+  const geocities = vibe === "geocities";
+  const C = vibe === "geocities" ? (dark ? THEMES.geoDark : THEMES.geoLight)
+          : vibe === "modern"    ? (dark ? THEMES.dark : THEMES.light)
+          : (dark ? THEMES.jdmDark : THEMES.jdmLight);
 
   function applyStyle(id) {
     const s = STYLE_BY_ID[id];
@@ -940,8 +1016,8 @@ export default function CookieBuildSheet() {
 
   const sc = SCOOPS[scoop];
   const cookieCount = v.doughWeight > 0 ? Math.max(1, Math.floor(v.doughWeight / sc.g)) : 0;
-  const dialSteps = useMemo(() => buildSteps({ method, eggForm, leaven, sugarPct, brownPct, butterPct, eggPct, flour, chill, chillIdx, sodaShare, ovenF, scoop, addins: selectedAddins, cocoa, verbosity, styleId: activeStyle }),
-    [method, eggForm, leaven, sugarPct, brownPct, butterPct, eggPct, flourIdx, chillIdx, sodaShare, ovenF, scoop, addinSel, cocoaOn, cocoaMode, cocoaPct, verbosity, activeStyle]);
+  const dialSteps = useMemo(() => buildSteps({ method, eggForm, leaven, sugarPct, brownPct, butterPct, eggPct, flour, chill, chillIdx, sodaShare, ovenF, scoop, addins: selectedAddins, cocoa, styleId: activeStyle }),
+    [method, eggForm, leaven, sugarPct, brownPct, butterPct, eggPct, flourIdx, chillIdx, sodaShare, ovenF, scoop, addinSel, cocoaOn, cocoaMode, cocoaPct, activeStyle]);
   const timeline = useMemo(() => buildTimeline({ method, chill, chillIdx, scoop, ovenF, addins: selectedAddins }),
     [method, chillIdx, scoop, ovenF, addinSel]);
 
@@ -965,7 +1041,6 @@ export default function CookieBuildSheet() {
   const groups = specialRecipe ? specialRecipe.groups : dialGroups;
   const STEPS = specialRecipe ? specialRecipe.steps : dialSteps;
   const profile = specialRecipe ? specialRecipe.profile : dialProfile;
-  const showWhy = verbosity >= 1;
   const ovenC = fToC(ovenF);
 
   const mono = "'IBM Plex Mono', monospace";
@@ -980,9 +1055,25 @@ export default function CookieBuildSheet() {
 
   return (
     <ThemeCtx.Provider value={C}>
-    <div style={{ background: C.paper, minHeight: "100vh", padding: "28px 16px 60px", fontFamily: "'Fraunces', serif", color: C.ink, colorScheme: dark ? "dark" : "light", backgroundImage: C.glow, transition: "background .25s ease, color .25s ease" }}>
+    <div className={geocities ? `geocities ${dark ? "geo-dark" : "geo-light"}` : undefined} style={{ backgroundColor: C.paper, minHeight: "100vh", padding: "28px 16px 60px", fontFamily: "'Fraunces', serif", color: C.ink, colorScheme: dark ? "dark" : "light", backgroundImage: C.glow, transition: "background .25s ease, color .25s ease" }}>
       <style>{FONTS}</style>
+      {geocities && <style>{GEO_CSS}</style>}
       <div style={{ width: "100%", maxWidth: 880, margin: "0 auto", animation: "riseIn .5s ease" }}>
+        {/* GeoCities banner — only when the page is in the geocities vibe */}
+        {geocities && (
+          <div style={{ marginBottom: 16, textAlign: "center" }}>
+            <marquee scrollamount="6" style={{ background: "#000080", color: "#00ff66", border: "3px ridge #c0c0c0", padding: "5px 0", fontWeight: 700, fontSize: 14 }}>
+              ✨🍪 Welcome to Will&apos;s Fantastic Cookie HomePage!! 🍪✨ &nbsp; Best viewed in Netscape Navigator 4.0 at 800×600 &nbsp; ✨ Don&apos;t forget to sign my guestbook!! ✨
+            </marquee>
+            <div style={{ marginTop: 9, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", alignItems: "center", fontSize: 13 }}>
+              <span className="geo-blink" style={{ color: C.choc, fontWeight: 900, letterSpacing: 1 }}>🚧 UNDER CONSTRUCTION 🚧</span>
+              <span className="geo-counter" style={{ background: "#000", color: "#00ff00", border: "2px inset #00ff00", padding: "2px 7px", letterSpacing: 4, fontWeight: 700 }}>
+                🍪 Visitors: 0013372
+              </span>
+              <span className="geo-rainbow" style={{ fontWeight: 900 }}>~ * Yum! * ~</span>
+            </div>
+          </div>
+        )}
         {/* Header */}
         <div style={{ borderBottom: `2px solid ${C.ink}`, paddingBottom: 14, marginBottom: 18, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 8 }}>
           <h1 style={{ margin: 0, fontSize: 40, fontWeight: 900, letterSpacing: -1, lineHeight: 0.95 }}>Cookies</h1>
@@ -1383,20 +1474,6 @@ export default function CookieBuildSheet() {
         </div>
         </>}
 
-        {/* Display options: verbosity + dark mode */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 10, marginBottom: 12 }}>
-          <div style={{ background: C.card, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "13px 15px 11px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-              <span style={{ fontSize: 15, fontWeight: 600 }}>Recipe detail</span>
-              <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color: C.butter, fontWeight: 600 }}>{VERBOSITY[verbosity]}</span>
-            </div>
-            <input type="range" min={0} max={2} step={1} value={verbosity} onChange={(e) => setVerbosity(Number(e.target.value))} style={{ width: "100%", accentColor: C.butter, margin: "9px 0 2px" }} />
-            <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: C.inkSoft }}>
-              {VERBOSITY.map((lbl, i) => <span key={lbl} style={{ color: i === verbosity ? C.butter : C.inkSoft, fontWeight: i === verbosity ? 600 : 400, flex: 1, textAlign: "center" }}>{lbl.toLowerCase()}</span>)}
-            </div>
-          </div>
-          <Toggle on={dark} onClick={() => setDark((d) => !d)} label={dark ? "Dark mode" : "Light mode"} sub={dark ? "warm charcoal" : "warm cream"} />
-        </div>
 
         {/* Live profile chips */}
         <div style={{ background: C.card, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "13px 15px", marginBottom: 22 }}>
@@ -1459,25 +1536,29 @@ export default function CookieBuildSheet() {
 
         {/* Process */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: C.choc, fontWeight: 600, marginBottom: 12 }}>
-          <span>Process{showWhy ? " — tap for the why" : ""}</span>
+          <span>Process — tap any step for the why</span>
           <span style={{ color: C.inkSoft, letterSpacing: 1 }}>{specialRecipe ? specialRecipe.clock : `${chill.clock} + bake`}</span>
         </div>
 
         {STEPS.map((s) => {
           const open = openStep === s.n;
           return (
-            <div key={s.n} style={{ border: `1.5px solid ${open && showWhy ? C.butter : C.line}`, borderRadius: 12, marginBottom: 9, overflow: "hidden", background: open && showWhy ? C.card : "transparent", transition: "border-color .18s ease" }}>
+            <div key={s.n} style={{ border: `1.5px solid ${open ? C.butter : C.line}`, borderRadius: 12, marginBottom: 9, overflow: "hidden", background: open ? C.card : "transparent", transition: "border-color .18s ease" }}>
               <button onClick={() => setOpenStep(open ? "" : s.n)} style={{ width: "100%", display: "flex", gap: 14, alignItems: "flex-start", textAlign: "left", background: "transparent", border: "none", cursor: "pointer", padding: "14px 16px", fontFamily: "'Fraunces', serif", color: C.ink }}>
-                <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 600, color: open && showWhy ? C.butter : C.bake, paddingTop: 3 }}>{s.n}</span>
+                <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, fontWeight: 600, color: open ? C.butter : C.bake, paddingTop: 3 }}>{s.n}</span>
                 <span style={{ flex: 1 }}>
                   <span style={{ fontSize: 19, fontWeight: 600, display: "block" }}>{s.title}</span>
-                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: C.inkSoft }}>{s.spec}</span>
+                  <span style={{ display: "block", fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, color: C.inkSoft, marginTop: 5 }}>
+                    {s.spec.split(" · ").map((seg, i) => (
+                      <span key={i} style={{ display: "block", paddingLeft: 13, textIndent: -11, lineHeight: 1.5 }}>• {seg}</span>
+                    ))}
+                  </span>
                 </span>
-                {showWhy && <span style={{ fontSize: 20, color: C.butter, transform: open ? "rotate(45deg)" : "none", transition: "transform .2s ease", lineHeight: 1, paddingTop: 2 }}>+</span>}
+                <span style={{ fontSize: 20, color: C.butter, transform: open ? "rotate(45deg)" : "none", transition: "transform .2s ease", lineHeight: 1, paddingTop: 2 }}>+</span>
               </button>
-              {open && showWhy && (
+              {open && (
                 <div style={{ padding: "0 16px 16px 44px", fontSize: 15.5, lineHeight: 1.55, color: C.inkSoft, whiteSpace: "pre-line", animation: "riseIn .25s ease" }}>
-                  {s.why}{verbosity >= 2 && s.more ? `\n\n${s.more}` : ""}
+                  {s.why}{s.more ? `\n\n${s.more}` : ""}
                 </div>
               )}
             </div>
