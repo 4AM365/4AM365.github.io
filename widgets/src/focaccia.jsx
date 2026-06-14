@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useContext, useEffect } from "react";
-const goldmemberImg = "/static/goldmember.png"; // served from quartz/static
+import { QUALITY_AXES, qualities, solveWithin, solveConforming, IDENTITY_KEYS } from "./src/focaccia-model.js";
 
 // ============================================================================
 // Focaccia Dashboard — drive the *qualities* (open crumb, tang, flake, fried
@@ -15,32 +15,6 @@ const goldmemberImg = "/static/goldmember.png"; // served from quartz/static
 const FONTS = `
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,800;9..144,900&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 @keyframes riseIn { from { opacity:0; transform: translateY(10px);} to {opacity:1; transform:none;} }
-`;
-
-// GeoCities skin stylesheet — injected only when the retro skin is on. Forced
-// with !important so it overrides the hardcoded inline fonts/borders without
-// rewriting every styled element. `.geo-dark`/`.geo-light` pick the tiled
-// background to match the mode toggle.
-const GEO_CSS = `
-@keyframes geoBlink { 50% { opacity: 0; } }
-@keyframes geoRainbow { 0%{color:#ff0040} 20%{color:#ff8c00} 40%{color:#ffe000} 60%{color:#00c853} 80%{color:#2962ff} 100%{color:#aa00ff} }
-.geocities, .geocities * { font-family: "Comic Sans MS","Comic Sans","Chalkboard SE",cursive !important; }
-.geocities .geo-counter, .geocities .geo-counter * { font-family: "Courier New", monospace !important; }
-.geocities button { border-style: outset !important; }
-.geocities { background-repeat: repeat !important; }
-.geocities.geo-dark { background-image:
-  radial-gradient(1.5px 1.5px at 20px 24px,#ffffff,transparent),
-  radial-gradient(1px 1px at 64px 52px,#aaeeff,transparent),
-  radial-gradient(1.5px 1.5px at 120px 88px,#ffffff,transparent),
-  radial-gradient(1px 1px at 150px 30px,#ffd0d0,transparent) !important;
-  background-size: 180px 130px !important; }
-.geocities.geo-light { background-image:
-  radial-gradient(3px 3px at 22px 24px,rgba(255,0,255,0.20),transparent),
-  radial-gradient(3px 3px at 92px 70px,rgba(0,0,238,0.16),transparent),
-  radial-gradient(3px 3px at 150px 34px,rgba(255,140,0,0.18),transparent) !important;
-  background-size: 175px 120px !important; }
-.geo-blink { animation: geoBlink 1.1s steps(1) infinite; }
-.geo-rainbow { animation: geoRainbow 5s linear infinite; font-weight: 900; }
 `;
 
 // ---- Theming ---------------------------------------------------------------
@@ -61,10 +35,7 @@ const THEMES = {
     glow: "radial-gradient(circle at 20% 10%, rgba(226,125,71,0.10), transparent 42%), radial-gradient(circle at 85% 0%, rgba(148,165,87,0.10), transparent 45%)",
     brineBg: "rgba(226,125,71,0.10)",
   },
-  // GeoCities skin — same keys, but 1998 personal-homepage energy. The tiled
-  // background, Comic Sans, bevels and blink live in GEO_CSS (injected when the
-  // skin is on); these palettes carry the clashing colours. Two variants so the
-  // light/dark mode toggle still works *within* the retro skin (four states).
+  // GeoCities skin — 1998 palette mapped onto the focaccia accent keys.
   geoLight: {
     paper: "#cfcfee", paperDeep: "#bcbce4", ink: "#000000", inkSoft: "#000080",
     olive: "#ff00ff", oliveDeep: "#c800c8", rust: "#0000ee", crust: "#ff6a00",
@@ -79,8 +50,7 @@ const THEMES = {
     glow: "none",
     brineBg: "rgba(255,224,0,0.10)",
   },
-  // JDM — matches the blog's default vibe (white / purple) so the widget stays
-  // coherent when the page is in the `jdm` vibe. Mapped from quartz.config.ts.
+  // JDM — the blog's default vibe (white / purple), so the widget stays coherent.
   jdmLight: {
     paper: "#ffffff", paperDeep: "#ece9f5", ink: "#1a1730", inkSoft: "#6b6688",
     olive: "#6d28d9", oliveDeep: "#5b21b6", rust: "#7c3aed", crust: "#a78bfa",
@@ -134,7 +104,7 @@ const SCHEDULES = [
 // honestly rather than faked with the dials.
 const STYLES = [
   // ---- The house ----
-  { id: "flaky", cat: "The house", name: "Flaky (thatsch a keeper)", tag: "laminated · fried",
+  { id: "flaky", cat: "The house", name: "Flaky (hot-rod)", tag: "laminated · fried",
     blurb: "The house build: a 3-day cold ferment, oiled lamination folds for a shreddy pull, and a deep pan-fry. Dough kept lean so the fat works the layers and the base, not the crumb.",
     set: { hydration: 82, schIdx: 3, folds: 3, panOilPct: 10, doughOilPct: 0, saltPct: 2.4, semolinaPct: 5, twoPans: true } },
   { id: "sameday", cat: "The house", name: "Same-day", tag: "weeknight",
@@ -149,7 +119,7 @@ const STYLES = [
     blurb: "Long, cold-fermented and very wet — a tall, wildly open, custardy crumb with a crisp, blistered top. Lean and restrained; the ferment does the flavour.",
     set: { hydration: 85, schIdx: 3, folds: 0, panOilPct: 7, doughOilPct: 3, saltPct: 2.4, semolinaPct: 5, twoPans: false } },
   { id: "barese", cat: "Classic Italian", name: "Pugliese · Barese", tag: "semola · tomato",
-    blurb: "Durum-semolina dough (golden, sandy crust), high hydration, classically studded with cherry tomatoes, olives and oregano. A southern, rustic loaf. Traditional versions also work boiled, riced potato (~20% of the flour) into the dough for a soft, moist, long-keeping crumb — the dials don't model that, so add it yourself for full authenticity.",
+    blurb: "Durum-semolina dough (golden, sandy crust), high hydration, classically studded with cherry tomatoes, olives and oregano. A southern, rustic loaf.",
     set: { hydration: 80, schIdx: 1, folds: 0, panOilPct: 9, doughOilPct: 4, saltPct: 2.2, semolinaPct: 15, twoPans: true } },
 
   // ---- Regional & obscure ----
@@ -177,8 +147,22 @@ const STYLES = [
 ];
 const STYLE_CATS = ["The house", "Classic Italian", "Regional & obscure"];
 const STYLE_BY_ID = Object.fromEntries(STYLES.map((s) => [s.id, s]));
-const DEFAULT_STYLE = "genovese";
-const STYLE_KEYS = ["hydration", "schIdx", "folds", "panOilPct", "doughOilPct", "saltPct", "semolinaPct", "twoPans"];
+const DEFAULT_STYLE = "flaky";
+// Each preset is now a *quality target* (its hand-authored recipe's forward
+// qualities); selecting a style drives the sliders and the inverse re-derives a
+// matching formula within that style's identity.
+STYLES.forEach((s) => { const qq = qualities(s.set); s.q = Object.fromEntries(QUALITY_AXES.map((a) => [a.key, Math.round(qq[a.key])])); });
+const identityOf = (set) => Object.fromEntries(IDENTITY_KEYS.map((k) => [k, set[k]]));
+
+// Short, corpus-grounded notes for each quality slider (src/focaccia-model.js CITES).
+const QUALITY_WHY = {
+  openness: "How open the crumb is. Slack high-hydration water, fermentation gas and oven spring blow big irregular holes; oil tightens it and weak gluten collapses it (Cauvain — mixing & proving).",
+  tang: "Clean & fresh vs. deep & sour — set by the ferment schedule. A long cold rise builds organic acids and aroma (Cauvain — breadmaking processes).",
+  flake: "Pillowy vs. shreddy. Oiled letter-folds laminate thin fat films into tearing layers — they need gluten to build the sheets.",
+  crust: "Soft vs. hard & fried. Pan oil shallow-fries the base crisp, a wet dough blisters, durum bakes a sandy crust; dough oil softens it.",
+  richness: "Olive oil — dough oil tenderises the crumb, pan oil enriches the base (Cauvain lists fat as a softening improver).",
+  salt: "The salt load — seasons, tightens the gluten and slows the yeast (Cauvain, Ch.2).",
+};
 
 // ---- Beyond the dials: fixed recipes -------------------------------------
 // These focacce break the dial model — unleavened, or enriched/sweet with eggs,
@@ -342,15 +326,13 @@ const SPECIAL_STYLES = [
 ];
 const SPECIAL_BY_ID = Object.fromEntries(SPECIAL_STYLES.map((s) => [s.id, s]));
 
-function matchStyle(cur) {
-  const hit = STYLES.find((s) => STYLE_KEYS.every((k) => s.set[k] === cur[k]));
-  return hit ? hit.id : "custom";
-}
+// (a style is an explicit binding now — see boundStyle; freestyle conforms to
+// the nearest style via the model's classify().)
 
 // ---- Traditional toppings & herbs ------------------------------------------
 // `styles` = which traditions a topping is classic for (drives the badge).
 // `short` = one-line prep (always shown in the table). `prep` = full method
-// (shown in the process step's expandable "why"). `prepSteps` = per-topping
+// (shown in the process step at Detailed verbosity). `prepSteps` = per-topping
 // prep detail; the Prep timeline gets its *ordering* and dependencies from
 // TOPPING_PLAN below. `water:true` flags a topping that weeps moisture into
 // the crumb (cherry tomatoes) so it can be folded into effective hydration.
@@ -422,6 +404,7 @@ const TOPPING_PLAN = {
   oregano:     { phase: "dimple", do: "Scatter dried with the tomatoes" },
 };
 
+const VERBOSITY = ["Terse", "Standard", "Detailed"];
 
 // Cherry tomatoes are ~95% water. These are the fractions of their weight that
 // realistically weep into the crumb during the bake — raw halves dump more;
@@ -581,10 +564,10 @@ function Dial({ label, value, min, max, step, onChange, readout, lo, hi, stops, 
 }
 
 // ---------------------------------------------------------------------------
-// Process generator — steps adapt to schedule, lamination, hydration, yeast and
-// toppings. Each step shows its spec as bullets; `why` + `more` reveal on tap.
+// Process generator — steps adapt to schedule, lamination, hydration, yeast,
+// toppings and verbosity. `more` is extra detail surfaced only at Detailed.
 // ---------------------------------------------------------------------------
-function buildSteps({ sch, schIdx, folds, hydration, panOilPct, doughOilPct, semolina, yeastType, toppings, tomato }) {
+function buildSteps({ sch, schIdx, folds, hydration, panOilPct, doughOilPct, semolina, yeastType, toppings, verbosity, tomato }) {
   const express = schIdx === 0;
   const ddt = express ? "26–27°C / 79–81°F" : "24–25°C / 75–77°F";
   const yt = YEAST_TYPES[yeastType] || YEAST_TYPES.instant;
@@ -594,9 +577,6 @@ function buildSteps({ sch, schIdx, folds, hydration, panOilPct, doughOilPct, sem
   const oilNote = doughOilPct > 0
     ? ` Once the dough is cohesive, drizzle in the ${round(doughOilPct, 1)}% dough oil and mix until it's fully absorbed and glossy again — adding it after the gluten has formed keeps the oil from coating the proteins and blunting development.`
     : "";
-  // Short form for the always-visible spec line so the dough oil shows even in
-  // Terse mode (where the `why` text — and the full oilNote — is hidden).
-  const oilSpecNote = doughOilPct > 0 ? ` · then work in the ${round(doughOilPct, 1)}% dough oil till absorbed` : "";
   const handling = hydration >= 84 ? "very slack and glossy — work it with wet hands"
     : hydration >= 76 ? "slack but cohesive" : "supple and easy to handle";
   const hot = panOilPct >= 10;
@@ -607,7 +587,7 @@ function buildSteps({ sch, schIdx, folds, hydration, panOilPct, doughOilPct, sem
     steps.push({ title: "Fermentolyse — warm", spec: `ALL flour + all WARM water (95–100°F / 35–38°C) + yeast (${round(sch.yeast * yt.factor, 2)}%) + sugar · rest 20 min · then salt`,
       why: `On a 2-hour clock you want fermentation from minute one. Mix everything but the salt with warm water and rest 20 min, covered: the flour fully hydrates (free extensibility) and the warm water wakes the yeast immediately. Hold the salt — it tightens gluten and slows yeast, blunting the fast start you need here.${bloom}`,
       more: `Aim to finish the dough around ${ddt} — warm, so it drives.` });
-    steps.push({ title: "Mix & develop", spec: `dough hook · low speed · 6–8 min · target dough temp ${ddt}${oilSpecNote}`,
+    steps.push({ title: "Mix & develop", spec: `dough hook · low speed · 6–8 min · target dough temp ${ddt}`,
       why: `Add the salt now, then develop a moderate, cohesive gluten net — enough to trap gas fast and hold the layers. At ${hydration}% the dough is ${handling}.${oilNote}`,
       more: `Watch the temperature: glossy and clearing the bowl, not over-beaten past ~28°C/82°F. Friction heats a fast dough quickly.` });
     steps.push({ title: "Warm bulk + oiled folds — the 1 hr rise", spec: `${sch.temp} · ${folds > 0 ? `${folds} oiled letter-fold${folds > 1 ? "s" : ""}` : "2 plain folds"} at 20 & 40 min · keep it covered`,
@@ -616,7 +596,7 @@ function buildSteps({ sch, schIdx, folds, hydration, panOilPct, doughOilPct, sem
   } else {
     steps.push({ title: "Autolyse", spec: "ALL flour + all dough water · mix to shaggy · cover · rest 30–45 min",
       why: `Mix flour and water to a shaggy mass with no dry flour, cover, and walk away. Every bit of flour hydrates and the flour's own enzymes start reorganizing gluten — extensibility and structure for free, with far less mixing. Cover it so the top can't dry. Hold yeast and salt for now.${bloom}` });
-    steps.push({ title: "Mix in yeast + salt; develop", spec: `add yeast, then salt · dough hook · low · 6–8 min · target dough temp ${ddt}${oilSpecNote}`,
+    steps.push({ title: "Mix in yeast + salt; develop", spec: `add yeast, then salt · dough hook · low · 6–8 min · target dough temp ${ddt}`,
       why: `Work in the yeast first, then the salt (added last so it doesn't fight the yeast or over-tighten early). Build a moderate, well-organized matrix — strong enough to trap gas and hold lamination, loose enough to stay extensible. At ${hydration}% it pulls off the hook ${handling}; stop when cohesive, not bone-dry.${oilNote}`,
       more: `Finishing near ${ddt} sets a controlled, even cold ferment rather than a runaway one.` });
     steps.push({ title: "Bulk start + strength folds", spec: "3–4 coil/letter folds · 30 min apart · ~2 hr warm, covered",
@@ -649,7 +629,7 @@ function buildSteps({ sch, schIdx, folds, hydration, panOilPct, doughOilPct, sem
   }
 
   if (toppings.length) {
-    const lines = toppings.map((t) => `${t.icon} ${t.label} — ${t.prep}`).join("\n");
+    const lines = toppings.map((t) => `${t.icon} ${t.label} — ${verbosity >= 2 ? t.prep : t.short}`).join("\n");
     const tomatoNote = tomato && tomato.on
       ? `\n\nNote on the tomatoes: at ${tomato.pct}% of flour (${round(tomato.load)}g), ${tomato.mode === "roast" ? "smashed & roasted" : "raw halves"} weep ≈${round(tomato.water)}g of water into the crumb — that pushes effective hydration from ${hydration}% to ≈${round(tomato.eff)}%. If you want to hold the ${hydration}% crumb, pull the dough water back to ≈${round(tomato.suggested)}% (the tomato panel up top does the math live).`
       : "";
@@ -801,37 +781,34 @@ function TimeGraph({ phases, spine, tracks, C, accent }) {
 
 // ---------------------------------------------------------------------------
 export default function FocacciaBuildSheet() {
-  const D0 = STYLE_BY_ID[DEFAULT_STYLE].set;
+  const D0 = STYLE_BY_ID[DEFAULT_STYLE];
   // master scale
   const [flour, setFlour] = useState(500);
-  // quality dials (initialised from the default style)
-  const [hydration, setHydration] = useState(D0.hydration);
-  const [schIdx, setSchIdx] = useState(D0.schIdx);
-  const [folds, setFolds] = useState(D0.folds);
-  const [panOilPct, setPanOilPct] = useState(D0.panOilPct);
-  const [doughOilPct, setDoughOilPct] = useState(D0.doughOilPct);
-  const [saltPct, setSaltPct] = useState(D0.saltPct);
-  const [semolinaPct, setSemolinaPct] = useState(D0.semolinaPct);
-  // options
-  const [twoPans, setTwoPans] = useState(D0.twoPans);
+  // The six quality sliders — what you drive. The recipe (hydration, lamination,
+  // oils, salt + the style's locked schedule/semola/two-pan identity) is *solved*
+  // from them. Binary mode: bound to a style (identity locked) or freestyle
+  // (conforms to the nearest style). See src/focaccia-model.js.
+  const [q, setQ] = useState(D0.q);
+  const [boundStyle, setBoundStyle] = useState(DEFAULT_STYLE);
+  const solved = useMemo(() => boundStyle
+    ? solveWithin(q, identityOf(STYLE_BY_ID[boundStyle].set), {})
+    : solveConforming(q, STYLES, {}), [q, boundStyle]);
+  const recipe = solved.recipe;
+  const { hydration, schIdx, folds, panOilPct, doughOilPct, saltPct, semolinaPct, twoPans } = recipe;
   const [yeastType, setYeastType] = useState("instant");
   const [toppingSel, setToppingSel] = useState({ rosemary: true });
   const [tomatoMode, setTomatoMode] = useState("raw"); // raw | roast
   const [tomatoPct, setTomatoPct] = useState(20);       // cherry tomatoes as % of flour
   const [prepDone, setPrepDone] = useState({});         // mise-en-place checklist
-  // Light/dark inherits from the host Quartz blog (it sets `saved-theme` on <html>
-  // and fires a `themechange` event); standalone, it falls back to light.
+  const verbosity = 1; // steps are always succinct — the verbosity control was dropped
+  // Light/dark + vibe inherit from the host Quartz blog (`saved-theme` /
+  // `saved-vibe` on <html>); standalone → light + jdm.
   const [dark, setDark] = useState(() => {
     try { return document.documentElement.getAttribute("saved-theme") === "dark"; } catch { return false; }
   });
-  // Vibe (skin) inherits from the host blog's `saved-vibe` (jdm | geocities | modern); standalone → jdm.
   const [vibe, setVibe] = useState(() => {
     try { return document.documentElement.getAttribute("saved-vibe") || "jdm"; } catch { return "jdm"; }
   });
-  const [openStep, setOpenStep] = useState("01");
-  const [special, setSpecial] = useState(null); // a "beyond the dials" fixed recipe, or null
-
-  // Follow the blog's light/dark + vibe switchers live when embedded there.
   useEffect(() => {
     const onTheme = (e) => { if (e && e.detail && e.detail.theme) setDark(e.detail.theme === "dark"); };
     const onVibe = (e) => { if (e && e.detail && e.detail.vibe) setVibe(e.detail.vibe); };
@@ -839,6 +816,8 @@ export default function FocacciaBuildSheet() {
     document.addEventListener("vibechange", onVibe);
     return () => { document.removeEventListener("themechange", onTheme); document.removeEventListener("vibechange", onVibe); };
   }, []);
+  const [openStep, setOpenStep] = useState("01");
+  const [special, setSpecial] = useState(null); // a "beyond the dials" fixed recipe, or null
   // kitchen environment (altitude + humidity for a ZIP/day, plus room temp)
   const [zip, setZip] = useState("");
   const [envDate, setEnvDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -850,9 +829,7 @@ export default function FocacciaBuildSheet() {
   const [envError, setEnvError] = useState("");
   const [envApplied, setEnvApplied] = useState(true); // fold the recalibration into the recipe
 
-  // Inherit the page's vibe + brightness → palette. `geocities` also drives the
-  // retro banner + GEO_CSS below.
-  const geocities = vibe === "geocities";
+  // Inherit the page's vibe + brightness → palette (standalone defaults to jdm).
   const C = vibe === "geocities" ? (dark ? THEMES.geoDark : THEMES.geoLight)
           : vibe === "modern"    ? (dark ? THEMES.dark : THEMES.light)
           : (dark ? THEMES.jdmDark : THEMES.jdmLight);
@@ -861,15 +838,18 @@ export default function FocacciaBuildSheet() {
     const s = STYLE_BY_ID[id];
     if (!s) return;
     setSpecial(null);
-    const k = s.set;
-    setHydration(k.hydration); setSchIdx(k.schIdx); setFolds(k.folds);
-    setPanOilPct(k.panOilPct); setDoughOilPct(k.doughOilPct);
-    setSaltPct(k.saltPct); setSemolinaPct(k.semolinaPct); setTwoPans(k.twoPans);
+    setBoundStyle(id);   // bind to this style — its identity is now locked
+    setQ(s.q);           // drive the sliders to this style's quality profile
+  }
+  function goFreestyle() {
+    setSpecial(null);
+    setBoundStyle(null); // unbind — the model conforms to the nearest style
   }
   function applySpecial(id) { setSpecial(id); setOpenStep("01"); }
   const toggleTopping = (id) => setToppingSel((t) => ({ ...t, [id]: !t[id] }));
   const togglePrep = (key) => setPrepDone((p) => ({ ...p, [key]: !p[key] }));
-  const activeStyle = matchStyle({ hydration, schIdx, folds, panOilPct, doughOilPct, saltPct, semolinaPct, twoPans });
+  const activeStyle = boundStyle || "custom";
+  const freestyleNearest = (!boundStyle && !special) ? solved.style : null;
   const selectedToppings = TOPPINGS.filter((t) => toppingSel[t.id]);
 
   const f = Math.max(0, Number(flour) || 0);
@@ -995,8 +975,8 @@ export default function FocacciaBuildSheet() {
   ];
 
   const perPan = twoPans ? v.doughWeight / 2 : v.doughWeight;
-  const dialSteps = useMemo(() => buildSteps({ sch, schIdx, folds, hydration, panOilPct, doughOilPct, semolina: semolinaPct > 0, yeastType, toppings: selectedToppings, tomato }),
-    [sch, schIdx, folds, hydration, panOilPct, doughOilPct, semolinaPct, yeastType, toppingSel, tomatoOn, tomatoMode, tomatoPct, f]);
+  const dialSteps = useMemo(() => buildSteps({ sch, schIdx, folds, hydration, panOilPct, doughOilPct, semolina: semolinaPct > 0, yeastType, toppings: selectedToppings, verbosity, tomato }),
+    [sch, schIdx, folds, hydration, panOilPct, doughOilPct, semolinaPct, yeastType, toppingSel, verbosity, tomatoOn, tomatoMode, tomatoPct, f]);
   const timeline = useMemo(() => buildTimeline({ sch, schIdx, folds, yeastType, toppings: selectedToppings, tomato }),
     [schIdx, folds, yeastType, toppingSel, tomatoOn, tomatoMode]);
 
@@ -1016,6 +996,7 @@ export default function FocacciaBuildSheet() {
   const STEPS = specialRecipe ? specialRecipe.steps : dialSteps;
   const profile = specialRecipe ? specialRecipe.profile : dialProfile;
 
+  // (verbosity/showWhy removed — steps always show the why on tap)
 
   const mono = "'IBM Plex Mono', monospace";
   const envFieldLabel = { display: "flex", flexDirection: "column", gap: 5, fontFamily: mono, fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: C.inkSoft, fontWeight: 600 };
@@ -1029,32 +1010,16 @@ export default function FocacciaBuildSheet() {
 
   return (
     <ThemeCtx.Provider value={C}>
-    <div className={geocities ? `geocities ${dark ? "geo-dark" : "geo-light"}` : undefined} style={{ backgroundColor: C.paper, minHeight: "100vh", padding: "28px 16px 60px", fontFamily: "'Fraunces', serif", color: C.ink, colorScheme: dark ? "dark" : "light", backgroundImage: C.glow, transition: "background .25s ease, color .25s ease" }}>
+    <div style={{ background: C.paper, minHeight: "100vh", padding: "28px 16px 60px", fontFamily: "'Fraunces', serif", color: C.ink, colorScheme: dark ? "dark" : "light", backgroundImage: C.glow, transition: "background .25s ease, color .25s ease" }}>
       <style>{FONTS}</style>
-      {geocities && <style>{GEO_CSS}</style>}
       <div style={{ width: "100%", maxWidth: 880, margin: "0 auto", animation: "riseIn .5s ease" }}>
-        {/* GeoCities banner — only when the page is in the geocities vibe */}
-        {geocities && (
-          <div style={{ marginBottom: 16, textAlign: "center" }}>
-            <marquee scrollamount="6" style={{ background: "#000080", color: "#00ff66", border: "3px ridge #c0c0c0", padding: "5px 0", fontWeight: 700, fontSize: 14 }}>
-              ✨🔥 Welcome to Will&apos;s Fantastic Focaccia HomePage!! 🔥✨ &nbsp; Best viewed in Netscape Navigator 4.0 at 800×600 &nbsp; ✨ Don&apos;t forget to sign my guestbook!! ✨
-            </marquee>
-            <div style={{ marginTop: 9, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", alignItems: "center", fontSize: 13 }}>
-              <span className="geo-blink" style={{ color: C.rust, fontWeight: 900, letterSpacing: 1 }}>🚧 UNDER CONSTRUCTION 🚧</span>
-              <span className="geo-counter" style={{ background: "#000", color: "#00ff00", border: "2px inset #00ff00", padding: "2px 7px", letterSpacing: 4, fontWeight: 700 }}>
-                ⛏ Visitors: 0013372
-              </span>
-              <span className="geo-rainbow" style={{ fontWeight: 900 }}>~ * Hot! * ~</span>
-            </div>
-          </div>
-        )}
         {/* Header */}
         <div style={{ borderBottom: `2px solid ${C.ink}`, paddingBottom: 14, marginBottom: 18, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 8 }}>
           <div>
             <h1 style={{ margin: 0, fontSize: 40, fontWeight: 900, letterSpacing: -1, lineHeight: 0.95 }}>Focaccia</h1>
           </div>
           <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, textAlign: "right", color: C.inkSoft, lineHeight: 1.5 }}>
-            <span style={{ color: C.rust, fontWeight: 600 }}>{specialDef ? specialDef.name : activeStyle === "custom" ? "Custom build" : STYLE_BY_ID[activeStyle].name}</span><br />
+            <span style={{ color: C.rust, fontWeight: 600 }}>{specialDef ? specialDef.name : !boundStyle ? "Freestyle" : STYLE_BY_ID[boundStyle].name}</span><br />
             {specialRecipe ? `fixed recipe · ${specialRecipe.clock}` : `${hydration}% hydration · ${sch.clock}`}
           </div>
         </div>
@@ -1063,29 +1028,31 @@ export default function FocacciaBuildSheet() {
         <div style={{ marginBottom: 18 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: C.rust, fontWeight: 600, margin: "2px 2px 10px" }}>
             <span>Style</span>
-            {activeStyle === "custom" && <span style={{ color: C.inkSoft, letterSpacing: 1 }}>custom · off-preset</span>}
+            <span style={{ color: C.inkSoft, letterSpacing: 1 }}>{special ? "fixed recipe" : boundStyle ? "bound · adjusting within" : "freestyle"}</span>
           </div>
+          <button onClick={goFreestyle} style={{
+            display: "flex", gap: 9, alignItems: "flex-start", textAlign: "left", cursor: "pointer", width: "100%",
+            borderRadius: 11, padding: "11px 12px", marginBottom: 10, transition: "all .15s ease", fontFamily: "'Fraunces', serif",
+            border: `1.5px solid ${!special && !boundStyle ? C.olive : C.line}`, background: !special && !boundStyle ? C.olive : C.card, color: !special && !boundStyle ? C.onAccent : C.ink }}>
+            <span style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${!special && !boundStyle ? C.onAccent : C.line}`, flexShrink: 0, marginTop: 2, position: "relative" }}>
+              {!special && !boundStyle && <span style={{ position: "absolute", inset: 2.5, borderRadius: "50%", background: C.onAccent }} />}
+            </span>
+            <span style={{ lineHeight: 1.25 }}>
+              <span style={{ display: "block", fontWeight: 600, fontSize: 15 }}>Freestyle</span>
+              <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, opacity: 0.8 }}>no style — conforms to the nearest tradition{freestyleNearest ? ` · closest: ${freestyleNearest.name}` : ""}</span>
+            </span>
+          </button>
           {STYLE_CATS.map((cat) => (
             <div key={cat} style={{ marginBottom: 10 }}>
               <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase", color: C.inkSoft, fontWeight: 600, margin: "0 2px 6px" }}>{cat}</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
                 {STYLES.filter((s) => s.cat === cat).map((s) => {
-                  const on = !special && activeStyle === s.id;
-                  // Easter egg: when the house "flaky" tile is the *selected* style,
-                  // Goldmember fills its background (a dark wash keeps the label
-                  // legible). Picking any other style clears it. Persistent, unlike
-                  // the old press-and-hold — a click is too brief to ever see.
-                  const goldOn = s.id === "flaky" && on;
+                  const on = !special && boundStyle === s.id;
                   return (
                     <button key={s.id} onClick={() => applyStyle(s.id)} style={{
                       display: "flex", gap: 9, alignItems: "flex-start", textAlign: "left", cursor: "pointer",
                       borderRadius: 11, padding: "11px 12px", transition: "all .15s ease", fontFamily: "'Fraunces', serif",
-                      border: `1.5px solid ${on ? C.olive : C.line}`,
-                      background: goldOn
-                        ? `linear-gradient(rgba(0,0,0,0.32), rgba(0,0,0,0.42)), ${C.olive} url(${goldmemberImg}) center / cover no-repeat`
-                        : on ? C.olive : C.card,
-                      color: on ? C.onAccent : C.ink,
-                      textShadow: goldOn ? "0 1px 3px rgba(0,0,0,0.9)" : "none" }}>
+                      border: `1.5px solid ${on ? C.olive : C.line}`, background: on ? C.olive : C.card, color: on ? C.onAccent : C.ink }}>
                       <span style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${on ? C.onAccent : C.line}`, flexShrink: 0, marginTop: 2, position: "relative" }}>
                         {on && <span style={{ position: "absolute", inset: 2.5, borderRadius: "50%", background: C.onAccent }} />}
                       </span>
@@ -1125,12 +1092,12 @@ export default function FocacciaBuildSheet() {
             </div>
           </div>
 
-          <div style={{ marginTop: 4, fontSize: 14, lineHeight: 1.5, color: C.inkSoft, fontStyle: "italic", borderLeft: `3px solid ${special ? C.rust : activeStyle === "custom" ? C.line : C.crust}`, paddingLeft: 12 }}>
+          <div style={{ marginTop: 4, fontSize: 14, lineHeight: 1.5, color: C.inkSoft, fontStyle: "italic", borderLeft: `3px solid ${special ? C.rust : !boundStyle ? C.line : C.crust}`, paddingLeft: 12 }}>
             {specialDef
               ? specialDef.blurb
-              : activeStyle === "custom"
-              ? "Custom — you've tuned the dials off any single tradition. Pick a style above to snap back to a preset."
-              : STYLE_BY_ID[activeStyle].blurb}
+              : !boundStyle
+              ? `Freestyle — no style selected, so the model adopts the nearest tradition's identity (schedule, semola, pan) and tunes the rest.${freestyleNearest ? ` Closest: ${freestyleNearest.name}.` : ""}`
+              : STYLE_BY_ID[boundStyle].blurb}
           </div>
         </div>
 
@@ -1304,33 +1271,19 @@ export default function FocacciaBuildSheet() {
         {/* The dials (dial-driven styles only) */}
         {!special && <>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: C.rust, fontWeight: 600, margin: "4px 2px 10px" }}>
-          <span>The dials</span>
+          <span>Drive the qualities</span>
+          <span style={{ color: C.inkSoft, letterSpacing: 1 }}>the formula is solved from these</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 10, marginBottom: 12 }}>
-          <Dial label="Crumb — hydration" value={hydration} min={65} max={90} step={1}
-            onChange={setHydration} readout={envOn && envAdj.hydrationDelta !== 0 ? `${hydration}% → ${hydrationAdj}% · ${round(v.water)}g` : `${hydration}% · ${round(v.water)}g`} lo="tight / bread-y" hi="open / custardy"
-            why="Water as a % of flour. Gluten forms from hydration plus kneading energy (Cauvain, Ch.2), and more water gives larger, more irregular holes and a moist, custardy crumb — at the cost of a slacker, wetter-to-handle dough. Below ~70% it bakes tighter and more sandwich-bread-like." />
-          <Dial label="Ferment & tang" value={schIdx} min={0} max={3} step={1}
-            onChange={setSchIdx} readout={`${sch.name} · ${sch.yeast}% yeast`} stops={["same-day", "night", "2-day", "3-day"]} accent
-            why={`The yeastiness/flavour axis. Long, cold fermentation builds organic acids and deep aroma while relaxing the gluten — so it needs less yeast because it works longer (Cauvain, Ch.2). Right now: ${sch.temp}, ${sch.clock} total, ${sch.tang}.`} />
-          <Dial label="Flakiness — lamination" value={folds} min={0} max={4} step={1}
-            onChange={setFolds} readout={folds === 0 ? "none" : `${folds} oiled fold${folds > 1 ? "s" : ""}`} stops={["0", "1", "2", "3", "4"]}
-            why="Letter-folds with oil drizzled between them lay down thin fat films that shred into flaky layers when baked — light lamination, not croissant layers. Zero folds is classic pillowy focaccia; more folds trade some height for a dramatic, tearing pull." />
-          <Dial label="Fried base — pan oil" value={panOilPct} min={6} max={12} step={1}
-            onChange={setPanOilPct} readout={`${panOilPct}% · ${round(v.panOil)}g`} lo="light fry" hi="deep shallow-fry" accent
-            why="Olive oil flooded into a dark metal pan shallow-fries the base into a crisp, blistered shell as it bakes. More oil = a deeper fry and a crunchier, more savoury bottom — push it too far and the very edges can turn greasy, so pair high oil with the longer bake." />
-          <Dial label="Dough oil — richness" value={doughOilPct} min={0} max={10} step={0.5}
-            onChange={setDoughOilPct} readout={doughOilPct === 0 ? "none" : `${round(doughOilPct, 1)}% · ${round(v.doughOil)}g`} lo="lean / Ligurian" hi="rich / tender"
-            why="Olive oil worked into the dough itself. Cauvain (Ch.2, Table 2.2) lists fat at 1–2% of flour as an optional improver that raises gas retention and crumb softness; the fat lubricates and shortens the gluten for a more tender, finer crumb. Focaccia genovese runs ~5%. Add it after the gluten has started forming so it doesn't blunt development." />
-          <Dial label="Salt" value={saltPct} min={1.6} max={2.8} step={0.1}
-            onChange={setSaltPct} readout={`${round(saltPct, 1)}% · ${round(v.salt, 1)}g`} lo="lean" hi="bold"
-            why="Salt seasons, but it also tightens the gluten network and slows the yeast — bakers even delay adding it to speed early fermentation (Cauvain, Ch.2). Higher salt = stronger structure and a slower rise; 2.2–2.5% is the usual focaccia window." />
-          <Dial label="Semolina swap" value={semolinaPct} min={0} max={15} step={1}
-            onChange={setSemolinaPct} readout={semolinaPct === 0 ? "none" : `${semolinaPct}% · ${round(v.sem)}g`} lo="all bread flour" hi="15% durum"
-            why="Swapping in durum semolina adds golden colour and a sandy, fracturing crust. It dilutes the gluten, though, so too much (beyond ~15%) dulls the rise and toughens the crumb." />
+          {QUALITY_AXES.map((a) => (
+            <Dial key={a.key} label={a.label} value={q[a.key]} min={0} max={100} step={1}
+              onChange={(val) => setQ((prev) => ({ ...prev, [a.key]: val }))}
+              readout={`${q[a.key]} / 100`} lo={a.lo} hi={a.hi}
+              accent={a.key === "tang" || a.key === "crust"} why={QUALITY_WHY[a.key]} />
+          ))}
         </div>
 
-        {/* Yeast form + two pans */}
+        {/* Yeast form — a baker's choice, not a quality the model solves */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, marginBottom: 12 }}>
           <div style={{ background: C.card, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "11px 14px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -1348,7 +1301,30 @@ export default function FocacciaBuildSheet() {
               {round(v.yeast, 2)}g · {round(v.yeastPctEff, 2)}% — {YEAST_TYPES[yeastType].note}
             </div>
           </div>
-          <Toggle on={twoPans} onClick={() => setTwoPans((s) => !s)} label="Split into 2 pans" sub="e.g. cherry-tomato + plain" />
+        </div>
+
+        {/* What the qualities tell you to use — the solved formula & method */}
+        <div style={{ background: C.card, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "13px 15px", marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 9, flexWrap: "wrap", gap: 6 }}>
+            <span style={{ fontSize: 15, fontWeight: 600 }}>Use this — solved from your qualities</span>
+            <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: C.inkSoft }}>{boundStyle ? `within ${STYLE_BY_ID[boundStyle].name}` : "freestyle"} · {Math.round(100 * Math.exp(-solved.residual / 500))}% match</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
+            {[
+              ["Ferment", sch.name, sch.tang],
+              ["Hydration", `${hydration}%`, hydration >= 84 ? "open & custardy" : hydration >= 76 ? "airy & balanced" : "tight & bread-y"],
+              ["Lamination", folds === 0 ? "none" : `${folds} oiled fold${folds > 1 ? "s" : ""}`, folds === 0 ? "pillowy" : "flaky shred"],
+              ["Grain", semolinaPct > 0 ? `${semolinaPct}% durum` : "all bread flour", semolinaPct > 0 ? "sandy crust" : "smooth crumb"],
+              ["Oil", `${round(doughOilPct, 1)}% dough · ${panOilPct}% pan`, "tender vs. fried base"],
+              ["Bake", twoPans ? "two pans" : "one pan", `${round(saltPct, 1)}% salt`],
+            ].map(([k, val, sub]) => (
+              <div key={k} style={{ background: C.paperDeep, border: `1px solid ${C.line}`, borderRadius: 9, padding: "9px 11px" }}>
+                <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9.5, letterSpacing: 1, textTransform: "uppercase", color: C.inkSoft, fontWeight: 600 }}>{k}</div>
+                <div style={{ fontSize: 14.5, fontWeight: 600, color: C.olive }}>{val}</div>
+                <div style={{ fontSize: 11, color: C.inkSoft, lineHeight: 1.3 }}>{sub}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Toppings & herbs */}
@@ -1363,8 +1339,7 @@ export default function FocacciaBuildSheet() {
             {TOPPINGS.map((t) => {
               const on = !!toppingSel[t.id];
               const trad = activeStyle !== "custom" && t.styles.includes(activeStyle);
-              const nStyles = t.styles.length;
-              const badge = activeStyle === "custom" ? `classic in ${nStyles} style${nStyles === 1 ? "" : "s"}` : trad ? "traditional" : "modern twist";
+              const badge = activeStyle === "custom" ? `classic in ${t.styles.length}` : trad ? "traditional" : "modern twist";
               const badgeCol = trad ? C.olive : C.inkSoft;
               return (
                 <button key={t.id} onClick={() => toggleTopping(t.id)} style={{
@@ -1459,6 +1434,7 @@ export default function FocacciaBuildSheet() {
         </div>
         </>}
 
+        {/* (verbosity + dark-mode toggle removed — theme inherits from the blog) */}
 
         {/* Live profile chips */}
         <div style={{ background: C.card, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "13px 15px", marginBottom: 22 }}>
@@ -1519,7 +1495,7 @@ export default function FocacciaBuildSheet() {
               </>}
         </div>
 
-        {/* Process */}
+        {/* Process — succinct bullet steps; tap any step for the why */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: C.rust, fontWeight: 600, marginBottom: 12 }}>
           <span>Process — tap any step for the why</span>
           <span style={{ color: C.inkSoft, letterSpacing: 1 }}>{specialRecipe ? specialRecipe.clock : `${sch.clock}${express ? " + bake" : ""}`}</span>
