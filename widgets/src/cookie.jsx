@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useContext, useEffect } from "react";
 import { QUALITY_AXES, qualities, solveWithin, solveConforming, IDENTITY_KEYS } from "./src/cookie-model.js";
+import { macrosPer100g } from "./src/nutrition.js";
 
 // ============================================================================
 // Cookie Dashboard — drive the *qualities* (spread, chew vs. crisp vs. cakey,
@@ -1047,6 +1048,7 @@ export default function CookieBuildSheet() {
 
   // A fixed recipe overrides the dial-driven output.
   const groups = specialRecipe ? specialRecipe.groups : dialGroups;
+  const macros = useMemo(() => macrosPer100g(groups.flatMap((g) => g.items)), [groups]);
   const STEPS = specialRecipe ? specialRecipe.steps : dialSteps;
   const profile = specialRecipe ? specialRecipe.profile : dialProfile;
   const ovenC = fToC(ovenF);
@@ -1558,6 +1560,33 @@ export default function CookieBuildSheet() {
                 <div style={summaryCard(C)}><div style={summaryLabel(C)}>Oven</div><div style={{ ...summaryVal(C), fontSize: 17 }}>{ovenF}°F · {sc.min}–{sc.max}m</div></div>
               </>}
         </div>
+
+        {/* Nutrition — gram-weighted macros normalised to a 100g serving */}
+        {macros && (
+          <div style={{ background: C.card, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "16px 18px", marginBottom: 28 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+              <span style={{ fontSize: 16, fontWeight: 600 }}>Nutrition — per 100g</span>
+              <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: C.inkSoft }}>estimated · dough as mixed</span>
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {[
+                ["Energy", `${macros.kcal}`, "kcal"],
+                ["Carbs", `${macros.carb}`, "g"],
+                ["of which sugars", `${macros.sugar}`, "g"],
+                ["Fat", `${macros.fat}`, "g"],
+                ["Protein", `${macros.protein}`, "g"],
+              ].map(([label, val, unit]) => (
+                <div key={label} style={{ flex: "1 1 100px", background: C.paperDeep, border: `1px solid ${C.line}`, borderRadius: 10, padding: "11px 13px" }}>
+                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9.5, letterSpacing: 1, textTransform: "uppercase", color: C.inkSoft, fontWeight: 600 }}>{label}</div>
+                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 22, fontWeight: 600, color: C.butter, marginTop: 3 }}>{val}<span style={{ fontSize: 12, opacity: 0.7, marginLeft: 3 }}>{unit}</span></div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 12, color: C.inkSoft, fontStyle: "italic", marginTop: 11 }}>
+              Mass-balance of the formula's ingredients (USDA FoodData Central densities). Baking drives off water, so a baked cookie runs a little more energy-dense per 100g.
+            </div>
+          </div>
+        )}
 
         {/* Process — succinct bullet steps; tap any step for the why */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: C.choc, fontWeight: 600, marginBottom: 12 }}>
