@@ -11,3 +11,10 @@ Tuning an ECUMaster EMU Black on a flex-fuel, cammed, drive-by-wire turbo build.
 - [[cylinder-trims-3d|Structuring 3D per-cylinder trims]]
 - [[ai-skills|AI tuning skills]]
 - [EMU Black table CSV breakout](https://github.com/4AM365/emubt_breakout)
+
+### Calculators
+
+Interactive, runs-in-your-browser tools:
+
+- [[combustion-cov|Combustion-stability (CoV) calculator]] — read CoV proxies (crank-speed jitter + per-cylinder knock scatter) from an EMU Black log
+- [[valve-clearance|Piston-to-valve clearance calculator]] — P2V clearance through the overlap, relative to stock

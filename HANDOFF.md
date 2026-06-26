@@ -40,6 +40,18 @@ cd ventures/4AM365.github.io && npm run build:widgets && git commit -am ... && g
 ```
 Embedded at `content/cars/valve-clearance.md`.
 
+**combustion-cov** — a **verbatim copy** like valve-clearance. Canonical source is
+the standalone `car-projects/combustion-cov` repo (`index.html`, a client-side port
+of `emu-black-tuning-notes/tools/emub_analysis/cov.py`); its `tools/sync-widget.mjs`
+emits the ESM `combustion-cov.jsx`, and `tools/verify-parity.mjs` asserts the JS math
+still matches the Python. To update:
+```
+cd car-projects/combustion-cov && node tools/verify-parity.mjs && node tools/sync-widget.mjs
+cp combustion-cov.jsx  ventures/4AM365.github.io/widgets/src/combustion-cov.jsx
+cd ventures/4AM365.github.io && npm run build:widgets && git commit -am ... && git push
+```
+Embedded at `content/cars/combustion-cov.md`.
+
 `build:widgets` (esbuild, React→preact/compat) bundles `widgets/src/<name>.jsx`
 → `quartz/static/widgets/<name>.js`. Pages embed via `data-widget="<name>"`.
 
