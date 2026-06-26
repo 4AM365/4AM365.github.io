@@ -30,6 +30,16 @@ cd ventures/4AM365.github.io && npm run build:widgets && git commit -am ... && g
 ```
 (Migrating cookie to the same git-dependency pattern as focaccia is a good follow-up.)
 
+**valve-clearance** — a **verbatim copy** like cookie. Canonical source is the
+standalone `car-projects/valve-clearance` repo (`index.html`); its
+`tools/sync-widget.mjs` emits the ESM `valve-clearance.jsx`. To update:
+```
+cd car-projects/valve-clearance && node tools/sync-widget.mjs
+cp valve-clearance.jsx  ventures/4AM365.github.io/widgets/src/valve-clearance.jsx
+cd ventures/4AM365.github.io && npm run build:widgets && git commit -am ... && git push
+```
+Embedded at `content/cars/valve-clearance.md`.
+
 `build:widgets` (esbuild, React→preact/compat) bundles `widgets/src/<name>.jsx`
 → `quartz/static/widgets/<name>.js`. Pages embed via `data-widget="<name>"`.
 
