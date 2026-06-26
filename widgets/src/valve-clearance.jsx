@@ -3,19 +3,24 @@
 // GENERATED from index.html by tools/sync-widget.mjs. Do not edit by hand —
 // edit index.html (the canonical standalone app) and re-run the sync.
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 
 // =============================================================================
 // Piston-to-Valve (P2V) clearance — physics
 // -----------------------------------------------------------------------------
-// Everything in mm and crank degrees. The overlap-TDC (exhaust→intake top dead
-// centre) is our zero: negative angles are BTDC on the exhaust stroke, positive
-// are ATDC on the intake stroke. P2V is the minimum gap between a valve head and
-// the piston crown swept through the overlap window — it is NOT valvetrain lash.
+// Lengths in mm, angles in crank degrees. A four-stroke is a 720° cycle; we use
+// a frame where the *overlap* TDC (exhaust→intake) is 0. Positive angles run
+// ATDC into the intake stroke (BDC at +180), negative run BTDC back through the
+// exhaust stroke (its BDC at −180). The firing TDC sits at ±360, where both
+// valves are shut — so P2V interference can only happen near 0 (overlap).
 //
-// This is a first-order, directional model for *comparing against stock*, not a
-// substitute for claying the engine. The headline number is the deviation from
-// the stock baseline, which is robust even where the absolute calibration is soft.
+// The piston follows an exact slider-crank (360°-periodic). The valves live
+// across the full 720°: intake opens just after 0 and shuts past +180; exhaust
+// opens before −180 and shuts just past 0. That separation is why a 360-only
+// view makes the exhaust look mistimed — it isn't, it's a stroke away.
+//
+// First-order, directional model for *comparing against stock* — not a substitute
+// for claying the engine. Trust the deviation from stock; clay the absolute.
 // =============================================================================
 
 const rad = (d) => (d * Math.PI) / 180;
@@ -31,8 +36,8 @@ function pistonDescent(theta, stroke, rod) {
 }
 
 // Half-cosine valve-lift lobe: 0 at the open/close points, peak at the
-// centerline. `centerline` is the crank angle (our TDC=0 frame) of peak lift;
-// `duration` is the full open duration in crank degrees.
+// centerline. `centerline` is the crank angle of peak lift; `duration` is the
+// full open duration in crank degrees.
 function valveLift(theta, centerline, duration, maxLift) {
   const half = duration / 2;
   const d = theta - centerline;
@@ -48,15 +53,17 @@ function valveDrop(lift, cam) {
   return recessEff + lift * Math.cos(rad(cam.angle));
 }
 
-// P2V clearance at one crank angle for one valve.
+// P2V clearance at one crank angle for one valve. `cam.pocket` is the valve-relief
+// depth machined into the piston on THIS side (intake or exhaust).
 function clearanceAt(theta, block, cam) {
   const gapPistonToDeck = block.deckClear + block.gasket + pistonDescent(theta, block.stroke, block.rod);
   const lift = valveLift(theta, cam.centerline, cam.duration, cam.maxLift);
-  return gapPistonToDeck + block.pocket - valveDrop(lift, cam);
+  return gapPistonToDeck + cam.pocket - valveDrop(lift, cam);
 }
 
-// Scan the overlap window for the tightest clearance.
-function scanMin(block, cam, lo = -110, hi = 110, step = 0.5) {
+// Scan the overlap window for the tightest clearance. ±180 covers even very long
+// cams; the firing TDC at ±360 is excluded but the valves are shut there anyway.
+function scanMin(block, cam, lo = -180, hi = 180, step = 0.5) {
   let best = Infinity, bestT = 0;
   for (let t = lo; t <= hi; t += step) {
     const c = clearanceAt(t, block, cam);
@@ -65,89 +72,107 @@ function scanMin(block, cam, lo = -110, hi = 110, step = 0.5) {
   return { clearance: best, theta: bestT };
 }
 
+// ---- Cam timing from the four valve events --------------------------------
+// Inputs follow the user's reference convention:
+//   intake:  IO = °ATDC,  IC = °ABDC
+//   exhaust: EO = °BBDC,  EC = °BTDC
+// Converted into our overlap-TDC=0 frame, then phased by VVT.
+function intakeCam(intake, advance) {
+  const phiIO = intake.io;                 // ATDC
+  const phiIC = 180 + intake.ic;           // ABDC, past +180 BDC
+  const centerline = (phiIO + phiIC) / 2 - advance; // advance pulls it earlier
+  return { centerline, duration: phiIC - phiIO };
+}
+function exhaustCam(exhaust, retard) {
+  const phiEO = -180 - exhaust.eo;         // BBDC, before −180 BDC
+  const phiEC = -exhaust.ec;               // BTDC, before 0
+  const centerline = (phiEO + phiEC) / 2 + retard;  // retard pushes it later
+  return { centerline, duration: phiEC - phiEO };
+}
+
 // ---- Self-test (fails loudly in console if the physics regress) -------------
 (function selfTest() {
   console.assert(Math.abs(pistonDescent(0, 80, 130)) < 1e-9, "piston at TDC must be 0");
-  console.assert(pistonDescent(90, 80, 130) > 0, "piston descends after TDC");
-  const cam = { centerline: 100, duration: 240, maxLift: 10, recess: 1, dia: 30, diaStock: 30, angle: 20 };
+  console.assert(pistonDescent(90, 80, 130) > 0 && Math.abs(pistonDescent(360, 80, 130)) < 1e-9, "piston 360-periodic");
   console.assert(Math.abs(valveLift(100, 100, 240, 10) - 10) < 1e-9, "peak lift at centerline");
   console.assert(valveLift(-30, 100, 240, 10) === 0, "no lift outside duration");
-  const b = { stroke: 80, rod: 130, deckClear: 0.5, gasket: 0.7, pocket: 2 };
-  const tight = scanMin(b, cam).clearance;
-  const looser = scanMin({ ...b, deckClear: 1.5 }, cam).clearance;
-  console.assert(looser > tight, "raising the deck (more deck clearance) must increase P2V");
+  const ic = intakeCam({ io: -5, ic: 45 }, 0);
+  console.assert(Math.abs(ic.centerline - 110) < 1e-9 && Math.abs(ic.duration - 230) < 1e-9, "intake event→centerline/duration");
+  const ec = exhaustCam({ eo: 45, ec: -5 }, 0);
+  console.assert(Math.abs(ec.centerline + 110) < 1e-9, "exhaust centerline is BTDC (negative)");
+  const cam = { centerline: 110, duration: 230, maxLift: 10, recess: 1, dia: 30, diaStock: 30, angle: 20, pocket: 2 };
+  const b = { stroke: 80, rod: 130, deckClear: 0.5, gasket: 0.7 };
+  console.assert(scanMin({ ...b, deckClear: 1.5 }, cam).clearance > scanMin(b, cam).clearance, "more deck clearance → more P2V");
+  console.assert(scanMin(b, { ...cam, pocket: 3 }).clearance > scanMin(b, cam).clearance, "deeper relief → more P2V");
 })();
 
 // =============================================================================
 // Configuration assembly — stock baseline vs the modified ("current") engine
 // =============================================================================
-
-// Build the {block, intake, exhaust} geometry for a given spec + mods + cam state.
 function buildConfig(stock, mods, vtecActive) {
   const block = {
-    stroke: stock.stroke,
-    rod: stock.rod,
+    stroke: stock.stroke, rod: stock.rod,
     deckClear: stock.deckClear - mods.deckMill, // milling the deck drops the head
     gasket: mods.gasket,                          // a thicker gasket lifts it back
-    pocket: mods.pocket,                          // valve-relief depth in the piston
   };
+  const ic = intakeCam(stock.intake, mods.intakeAdvance);
+  const ec = exhaustCam(stock.exhaust, mods.exhaustRetard);
   const intake = {
-    angle: stock.intake.angle,
-    dia: mods.intakeDia, diaStock: stock.intake.dia,
-    recess: stock.intake.recess,
+    angle: stock.intake.angle, dia: mods.intakeDia, diaStock: stock.intake.dia,
+    recess: stock.intake.recess, pocket: mods.intakePocket,
     maxLift: vtecActive ? stock.vtec.intLift : stock.intake.lift,
-    duration: vtecActive ? stock.vtec.intDur : stock.intake.duration,
-    centerline: stock.intake.cl - mods.intakeAdvance, // advance = earlier = more overlap
+    duration: vtecActive ? stock.vtec.intDur : ic.duration,
+    centerline: ic.centerline,
   };
   const exhaust = {
-    angle: stock.exhaust.angle,
-    dia: mods.exhaustDia, diaStock: stock.exhaust.dia,
-    recess: stock.exhaust.recess,
+    angle: stock.exhaust.angle, dia: mods.exhaustDia, diaStock: stock.exhaust.dia,
+    recess: stock.exhaust.recess, pocket: mods.exhaustPocket,
     maxLift: vtecActive ? stock.vtec.exhLift : stock.exhaust.lift,
-    duration: vtecActive ? stock.vtec.exhDur : stock.exhaust.duration,
-    centerline: -stock.exhaust.cl + mods.exhaustRetard, // retard = later = more overlap
+    duration: vtecActive ? stock.vtec.exhDur : ec.duration,
+    centerline: ec.centerline,
   };
-  return { block, intake, exhaust };
+  return { block, intake, exhaust, ic, ec };
 }
 
 // The untouched factory engine — the yardstick everything is measured against.
 function stockConfig(stock) {
-  const mods = {
-    deckMill: 0, gasket: stock.gasket, pocket: stock.pocket,
+  return buildConfig(stock, {
+    deckMill: 0, gasket: stock.gasket,
+    intakePocket: stock.pocketInt, exhaustPocket: stock.pocketExh,
     intakeDia: stock.intake.dia, exhaustDia: stock.exhaust.dia,
     intakeAdvance: 0, exhaustRetard: 0,
-  };
-  return buildConfig(stock, mods, false);
+  }, false);
 }
 
 // =============================================================================
 // Defaults — a Honda B16-flavoured VTEC four (so VTEC actually does something)
 // =============================================================================
 const DEFAULT_STOCK = {
-  stroke: 77.4, rod: 134.0,
-  deckClear: 0.50, gasket: 0.70, pocket: 2.00,
-  intake:  { angle: 22, dia: 33, recess: 1.2, lift: 10.3, duration: 230, cl: 110 },
-  exhaust: { angle: 22, dia: 28, recess: 1.4, lift: 9.4,  duration: 230, cl: 110 },
+  stroke: 77.4, rod: 134.0, deckClear: 0.50, gasket: 0.70,
+  pocketInt: 2.00, pocketExh: 2.00,
+  intake:  { angle: 22, dia: 33, recess: 1.2, lift: 10.3, io: -5, ic: 45 },
+  exhaust: { angle: 22, dia: 28, recess: 1.4, lift: 9.4,  eo: 45, ec: -5 },
   vtec: { intLift: 11.5, intDur: 252, exhLift: 10.5, exhDur: 248 },
 };
 const DEFAULT_MODS = {
-  deckMill: 0, gasket: 0.70, pocket: 2.00,
-  intakeDia: 33, exhaustDia: 28,
-  intakeAdvance: 0, exhaustRetard: 0,
+  deckMill: 0, gasket: 0.70, intakePocket: 2.00, exhaustPocket: 2.00,
+  intakeDia: 33, exhaustDia: 28, intakeAdvance: 0, exhaustRetard: 0,
 };
 
 const PRESETS = {
   "Honda B16 (VTEC I4)": DEFAULT_STOCK,
   "Toyota 2JZ-GTE (I6 turbo)": {
-    stroke: 86.0, rod: 142.0, deckClear: 0.40, gasket: 1.30, pocket: 2.20,
-    intake:  { angle: 21.5, dia: 33.5, recess: 1.3, lift: 8.7, duration: 224, cl: 114 },
-    exhaust: { angle: 21.5, dia: 29.0, recess: 1.5, lift: 8.3, duration: 236, cl: 114 },
+    stroke: 86.0, rod: 142.0, deckClear: 0.40, gasket: 1.30,
+    pocketInt: 2.20, pocketExh: 2.20,
+    intake:  { angle: 21.5, dia: 33.5, recess: 1.3, lift: 8.7, io: 2, ic: 46 },
+    exhaust: { angle: 21.5, dia: 29.0, recess: 1.5, lift: 8.3, eo: 52, ec: -4 },
     vtec: { intLift: 8.7, intDur: 224, exhLift: 8.3, exhDur: 236 }, // no VTEC, hi=stock
   },
   "Chevy LS (pushrod V8)": {
-    stroke: 92.0, rod: 154.0, deckClear: 0.25, gasket: 1.00, pocket: 1.50,
-    intake:  { angle: 15, dia: 54, recess: 1.0, lift: 13.5, duration: 196, cl: 110 },
-    exhaust: { angle: 15, dia: 41.5, recess: 1.2, lift: 13.0, duration: 207, cl: 116 },
+    stroke: 92.0, rod: 154.0, deckClear: 0.25, gasket: 1.00,
+    pocketInt: 1.50, pocketExh: 1.50,
+    intake:  { angle: 15, dia: 54, recess: 1.0, lift: 13.5, io: 12, ic: 28 },
+    exhaust: { angle: 15, dia: 41.5, recess: 1.2, lift: 13.0, eo: 39.5, ec: 12.5 },
     vtec: { intLift: 13.5, intDur: 196, exhLift: 13.0, exhDur: 207 },
   },
 };
@@ -187,16 +212,16 @@ function NumField({ label, value, onChange, step = 0.1, min, max, unit, w = 88 }
   );
 }
 
-function Slider({ label, value, min, max, step, onChange, unit, color = C.accent, readout }) {
+function Slider({ label, value, min, max, step, onChange, unit, color = C.accent, readout, disabled }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, opacity: disabled ? 0.45 : 1 }}>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
         <span style={{ color: C.ink }}>{label}</span>
         <span style={{ fontFamily: C.mono, color, fontWeight: 600 }}>
           {readout != null ? readout : `${value}${unit || ""}`}
         </span>
       </div>
-      <input type="range" min={min} max={max} step={step} value={value}
+      <input type="range" min={min} max={max} step={step} value={value} disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
         style={{ width: "100%", accentColor: color }} />
     </div>
@@ -239,14 +264,11 @@ function ClearanceChart({ intakeCurve, exhaustCurve, stockIntake, stockExhaust, 
           <text x={padL - 6} y={Y(v) + 3} textAnchor="end" fontSize="10" fill={C.inkSoft} fontFamily={C.mono}>{v}</text>
         </g>
       ))}
-      {/* danger / caution bands for reference */}
       <line x1={padL} y1={Y(THRESH.cautionExh)} x2={W - padR} y2={Y(THRESH.cautionExh)} stroke="#d97706" strokeWidth="0.8" strokeDasharray="3 3" opacity="0.7" />
       <line x1={padL} y1={Y(THRESH.dangerExh)} x2={W - padR} y2={Y(THRESH.dangerExh)} stroke="#dc2626" strokeWidth="0.8" strokeDasharray="3 3" opacity="0.7" />
-      {/* TDC marker + current angle */}
       <line x1={X(0)} y1={padT} x2={X(0)} y2={H - padB} stroke={C.inkSoft} strokeWidth="0.8" opacity="0.5" />
       <text x={X(0)} y={H - padB + 14} textAnchor="middle" fontSize="9.5" fill={C.inkSoft} fontFamily={C.mono}>TDC</text>
       <line x1={X(theta)} y1={padT} x2={X(theta)} y2={H - padB} stroke={C.accent} strokeWidth="1.2" opacity="0.9" />
-      {/* stock (faded) vs current */}
       <path d={path(stockIntake)} fill="none" stroke={C.intake} strokeWidth="1" opacity="0.35" strokeDasharray="4 3" />
       <path d={path(stockExhaust)} fill="none" stroke={C.exhaust} strokeWidth="1" opacity="0.35" strokeDasharray="4 3" />
       <path d={path(intakeCurve)} fill="none" stroke={C.intake} strokeWidth="2.2" />
@@ -256,83 +278,79 @@ function ClearanceChart({ intakeCurve, exhaustCurve, stockIntake, stockExhaust, 
   );
 }
 
-function LiftChart({ intake, exhaust }) {
-  const W = 520, H = 150, padL = 30, padR = 12, padT = 10, padB = 24;
+// Full 720° valve-event view: exhaust on the up-stroke into overlap, intake on
+// the down-stroke out of it. Marks both TDCs and both BDCs so the timing reads.
+function LiftChart({ intake, exhaust, theta }) {
+  const W = 520, H = 168, padL = 30, padR = 12, padT = 12, padB = 26;
   const data = [];
-  for (let t = -140; t <= 140; t += 2) {
+  for (let t = -360; t <= 360; t += 3) {
     data.push({ t, i: valveLift(t, intake.centerline, intake.duration, intake.maxLift),
       e: valveLift(t, exhaust.centerline, exhaust.duration, exhaust.maxLift) });
   }
-  const yMax = Math.max(intake.maxLift, exhaust.maxLift) * 1.1;
-  const X = (t) => padL + ((t + 140) / 280) * (W - padL - padR);
+  const yMax = Math.max(intake.maxLift, exhaust.maxLift) * 1.12;
+  const X = (t) => padL + ((t + 360) / 720) * (W - padL - padR);
   const Y = (v) => padT + (1 - v / yMax) * (H - padT - padB);
   const path = (key) => data.map((p, idx) => `${idx ? "L" : "M"}${X(p.t).toFixed(1)} ${Y(p[key]).toFixed(1)}`).join(" ");
+  const marks = [[-360, "TDC"], [-180, "BDC"], [0, "TDC·overlap"], [180, "BDC"], [360, "TDC"]];
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }}>
+      {/* overlap shading near 0 */}
+      <rect x={X(-60)} y={padT} width={X(60) - X(-60)} height={H - padT - padB} fill={C.accent} opacity="0.07" />
       <line x1={padL} y1={Y(0)} x2={W - padR} y2={Y(0)} stroke={C.line} />
-      <line x1={X(0)} y1={padT} x2={X(0)} y2={H - padB} stroke={C.inkSoft} strokeWidth="0.8" opacity="0.5" />
-      <text x={X(0)} y={H - padB + 13} textAnchor="middle" fontSize="9.5" fill={C.inkSoft} fontFamily={C.mono}>TDC</text>
+      {marks.map(([t, lbl]) => (
+        <g key={t}>
+          <line x1={X(t)} y1={padT} x2={X(t)} y2={H - padB} stroke={C.inkSoft} strokeWidth="0.7" opacity={t === 0 ? 0.6 : 0.3} />
+          <text x={X(t)} y={H - padB + 13} textAnchor="middle" fontSize="9" fill={C.inkSoft} fontFamily={C.mono}>{lbl}</text>
+        </g>
+      ))}
+      <line x1={X(theta)} y1={padT} x2={X(theta)} y2={H - padB} stroke={C.accent} strokeWidth="1.2" />
       <path d={path("e")} fill="none" stroke={C.exhaust} strokeWidth="2" />
       <path d={path("i")} fill="none" stroke={C.intake} strokeWidth="2" />
-      <text x={padL} y={padT + 8} fontSize="10" fill={C.inkSoft} fontFamily={C.mono}>lift (mm)</text>
+      <text x={padL} y={padT + 6} fontSize="10" fill={C.inkSoft} fontFamily={C.mono}>lift (mm) · full 720° cycle</text>
     </svg>
   );
 }
 
 // =============================================================================
-// Cross-section — a schematic engine slice at the selected crank angle
+// Cross-section — a schematic slice at the selected crank angle
 // =============================================================================
 function CrossSection({ cfg, theta }) {
-  const pp = 7.5;             // px per mm (vertical scale)
-  const W = 360, H = 340;
-  const yDeck = 78;          // fire-deck line
+  const pp = 7.5;            // px per mm; this is a zoomed view of the bore top
+  const W = 360, H = 360;
+  const yDeck = 80;
   const bore = { l: 58, r: 302, center: 180 };
   const seatI = 132, seatE = 228;
 
   const gapPH = cfg.block.deckClear + cfg.block.gasket + pistonDescent(theta, cfg.block.stroke, cfg.block.rod);
   const pistonY = yDeck + gapPH * pp;
 
-  const valve = (seatX, cam, tiltSign) => {
+  const mkValve = (seatX, cam, tiltSign) => {
     const lift = valveLift(theta, cam.centerline, cam.duration, cam.maxLift);
-    const drop = valveDrop(lift, cam);                 // vertical mm below deck
-    const tilt = tiltSign * cam.angle;                 // visual lean
+    const drop = valveDrop(lift, cam);
     const faceR = clamp((cam.dia / 2) * pp * 0.42, 10, 40);
-    const axialPx = drop * pp / Math.cos(rad(cam.angle));
-    return { lift, drop, tilt, faceR, axialPx, seatX,
-      faceCenterY: yDeck + drop * pp,
-      open: lift > 0.05 };
+    return { lift, drop, tilt: tiltSign * cam.angle, faceR, seatX, pocket: cam.pocket,
+      axialPx: (drop * pp) / Math.cos(rad(cam.angle)), faceCenterY: yDeck + drop * pp };
   };
-  const vi = valve(seatI, cfg.intake, -1);
-  const ve = valve(seatE, cfg.exhaust, +1);
-
+  const vi = mkValve(seatI, cfg.intake, -1);
+  const ve = mkValve(seatE, cfg.exhaust, +1);
   const clearI = clearanceAt(theta, cfg.block, cfg.intake);
   const clearE = clearanceAt(theta, cfg.block, cfg.exhaust);
 
-  // piston crown path with two relief notches under the valves
-  const notchW = 30, notchD = cfg.block.pocket * pp;
-  const crown = (x) => {
-    const half = notchW / 2;
-    return `M${bore.l} ${pistonY}
-      L${x - half} ${pistonY} Q${x - half + 5} ${pistonY} ${x - half + 5} ${pistonY + notchD}
-      L${x + half - 5} ${pistonY + notchD} Q${x + half} ${pistonY} ${x + half} ${pistonY}
-      L${bore.r} ${pistonY} L${bore.r} ${H} L${bore.l} ${H} Z`;
-  };
-
-  const dim = (x, y1, y2, val, color) => (
+  const dim = (x, y1, y2, val, color) => (y2 > y1 + 4 && y1 > yDeck - 2 && y2 < H) ? (
     <g>
       <line x1={x} y1={y1} x2={x} y2={y2} stroke={color} strokeWidth="1.2" markerEnd="url(#ar)" markerStart="url(#ar)" />
       <rect x={x + 4} y={(y1 + y2) / 2 - 8} width="52" height="16" rx="3" fill={C.panel} stroke={color} strokeWidth="0.7" />
       <text x={x + 30} y={(y1 + y2) / 2 + 3.5} textAnchor="middle" fontSize="10" fill={color} fontFamily={C.mono}>{fmt(val)}mm</text>
     </g>
-  );
+  ) : null;
 
   const Valve = ({ v, color, label }) => (
     <g transform={`translate(${v.seatX} ${yDeck}) rotate(${v.tilt})`}>
-      <line x1="0" y1="-46" x2="0" y2={v.axialPx} stroke={color} strokeWidth="3.5" strokeLinecap="round" opacity="0.85" />
-      <rect x="-3.2" y="-46" width="6.4" height="8" rx="2" fill={color} />
+      <line x1="0" y1="-48" x2="0" y2={v.axialPx} stroke={color} strokeWidth="3.5" strokeLinecap="round" opacity="0.85" />
+      <rect x="-3.2" y="-48" width="6.4" height="8" rx="2" fill={color} />
       <path d={`M${-v.faceR} ${v.axialPx} L${v.faceR} ${v.axialPx} L${v.faceR * 0.62} ${v.axialPx + 7} L${-v.faceR * 0.62} ${v.axialPx + 7} Z`}
         fill={color} opacity="0.9" />
-      <text x="0" y="-52" textAnchor="middle" fontSize="10" fill={color} fontFamily={C.mono} fontWeight="600">{label}</text>
+      <text x="0" y="-54" textAnchor="middle" fontSize="10" fill={color} fontFamily={C.mono} fontWeight="600">{label}</text>
     </g>
   );
 
@@ -342,35 +360,36 @@ function CrossSection({ cfg, theta }) {
         <marker id="ar" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto">
           <path d="M1 1 L6 3.5 L1 6" fill="none" stroke="currentColor" strokeWidth="1.1" />
         </marker>
+        <clipPath id="bore"><rect x={bore.l} y={yDeck} width={bore.r - bore.l} height={H - yDeck} /></clipPath>
       </defs>
 
       {/* cylinder head */}
       <rect x={bore.l - 12} y={20} width={bore.r - bore.l + 24} height={yDeck - 20} fill={C.panel2} stroke={C.line} />
       <text x={bore.center} y={36} textAnchor="middle" fontSize="10.5" fill={C.inkSoft} fontFamily={C.mono}>cylinder head</text>
-      {/* gasket band */}
       <rect x={bore.l} y={yDeck} width={bore.r - bore.l} height={Math.max(2, cfg.block.gasket * pp)} fill={C.accentDeep} opacity="0.55" />
-      {/* fire-deck line */}
       <line x1={bore.l} y1={yDeck} x2={bore.r} y2={yDeck} stroke={C.accent} strokeWidth="1.5" />
-      {/* bore walls */}
       <line x1={bore.l} y1={yDeck} x2={bore.l} y2={H} stroke={C.line} strokeWidth="2" />
       <line x1={bore.r} y1={yDeck} x2={bore.r} y2={H} stroke={C.line} strokeWidth="2" />
 
-      {/* piston */}
-      <path d={crown(seatI < seatE ? seatI : seatE)} fill="none" />
-      <path d={`M${bore.l} ${pistonY} L${bore.r} ${pistonY} L${bore.r} ${H} L${bore.l} ${H} Z`} fill={C.piston} opacity="0.18" />
-      {/* notches */}
-      {[ [seatI, cfg.intake], [seatE, cfg.exhaust] ].map(([x], i) => (
-        <rect key={i} x={x - notchW / 2} y={pistonY} width={notchW} height={notchD} rx="4" fill={C.piston} opacity="0.28" />
-      ))}
-      <line x1={bore.l} y1={pistonY} x2={bore.r} y2={pistonY} stroke={C.piston} strokeWidth="2.5" />
-      <text x={bore.center} y={H - 12} textAnchor="middle" fontSize="10.5" fill={C.piston} fontFamily={C.mono}>piston crown</text>
+      {/* piston (clipped to the bore so it slides cleanly out the bottom) */}
+      <g clipPath="url(#bore)">
+        <rect x={bore.l} y={pistonY} width={bore.r - bore.l} height={Math.max(0, H - pistonY)} fill={C.piston} opacity="0.18" />
+        {[vi, ve].map((v, i) => (
+          <rect key={i} x={v.seatX - 15} y={pistonY} width={30} height={v.pocket * pp} rx="4" fill={C.piston} opacity="0.30" />
+        ))}
+        {pistonY < H && <line x1={bore.l} y1={pistonY} x2={bore.r} y2={pistonY} stroke={C.piston} strokeWidth="2.5" />}
+        <Valve v={vi} color={C.intake} label="IN" />
+        <Valve v={ve} color={C.exhaust} label="EX" />
+        <g style={{ color: C.intake }}>{dim(seatI - 6, vi.faceCenterY, pistonY + vi.pocket * pp, clearI, C.intake)}</g>
+        <g style={{ color: C.exhaust }}>{dim(seatE - 6, ve.faceCenterY, pistonY + ve.pocket * pp, clearE, C.exhaust)}</g>
+      </g>
 
-      <Valve v={vi} color={C.intake} label="IN" />
-      <Valve v={ve} color={C.exhaust} label="EX" />
-
-      {/* clearance dimensions */}
-      <g style={{ color: C.intake }}>{dim(seatI - 6, vi.faceCenterY, pistonY + notchD, clearI, C.intake)}</g>
-      <g style={{ color: C.exhaust }}>{dim(seatE - 6, ve.faceCenterY, pistonY + notchD, clearE, C.exhaust)}</g>
+      {/* live clearance readouts (always visible, even when the piston is off-view) */}
+      <text x={bore.l + 4} y={H - 22} fontSize="11" fill={C.intake} fontFamily={C.mono}>IN {fmt(clearI)}mm</text>
+      <text x={bore.r - 4} y={H - 22} textAnchor="end" fontSize="11" fill={C.exhaust} fontFamily={C.mono}>EX {fmt(clearE)}mm</text>
+      <text x={bore.center} y={H - 6} textAnchor="middle" fontSize="9.5" fill={C.inkSoft} fontFamily={C.mono}>
+        {fmt(Math.abs(theta), 0)}° {theta < 0 ? "BTDC" : "ATDC"} · piston {fmt(pistonDescent(theta, cfg.block.stroke, cfg.block.rod))}mm down
+      </text>
     </svg>
   );
 }
@@ -386,6 +405,8 @@ function App() {
   const [rpm, setRpm] = useState(3000);
   const [theta, setTheta] = useState(8);
   const [autoCrit, setAutoCrit] = useState(true);
+  const [playing, setPlaying] = useState(false);
+  const [animTheta, setAnimTheta] = useState(0);
 
   const vtecActive = vtecOn && rpm >= vtecRpm;
   const cfg = useMemo(() => buildConfig(stock, mods, vtecActive), [stock, mods, vtecActive]);
@@ -397,31 +418,47 @@ function App() {
     const si = scanMin(stockCfg.block, stockCfg.intake);
     const se = scanMin(stockCfg.block, stockCfg.exhaust);
     const curve = (block, cam) => {
-      const a = []; for (let t = -70; t <= 70; t += 1) a.push({ theta: t, clear: clearanceAt(t, block, cam) }); return a;
+      const a = []; for (let t = -90; t <= 90; t += 1) a.push({ theta: t, clear: clearanceAt(t, block, cam) }); return a;
     };
-    return {
-      i, e, si, se,
-      intakeCurve: curve(cfg.block, cfg.intake),
-      exhaustCurve: curve(cfg.block, cfg.exhaust),
-      stockIntakeCurve: curve(stockCfg.block, stockCfg.intake),
-      stockExhaustCurve: curve(stockCfg.block, stockCfg.exhaust),
-    };
+    return { i, e, si, se,
+      intakeCurve: curve(cfg.block, cfg.intake), exhaustCurve: curve(cfg.block, cfg.exhaust),
+      stockIntakeCurve: curve(stockCfg.block, stockCfg.intake), stockExhaustCurve: curve(stockCfg.block, stockCfg.exhaust) };
   }, [cfg, stockCfg]);
 
-  // crank angle shown in the cross-section: the governing (tightest) valve's angle
-  const critTheta = result.i.clearance <= result.e.clearance ? result.i.theta : result.e.theta;
-  const shownTheta = autoCrit ? critTheta : theta;
+  // Animate the crank through a full 720° cycle (−360…+360) so the piston sweeps
+  // both strokes and the valves fire in time.
+  const raf = useRef(0), last = useRef(0);
+  useEffect(() => {
+    if (!playing) return;
+    const SPEED = 320; // crank°/sec
+    last.current = 0;
+    const tick = (ts) => {
+      if (!last.current) last.current = ts;
+      const dt = (ts - last.current) / 1000; last.current = ts;
+      setAnimTheta((a) => { let n = a + SPEED * dt; if (n > 360) n -= 720; return n; });
+      raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf.current);
+  }, [playing]);
 
-  const overlap = useMemo(() => {
-    const intakeOpen = cfg.intake.centerline - cfg.intake.duration / 2;
-    const exhaustClose = cfg.exhaust.centerline + cfg.exhaust.duration / 2;
-    return exhaustClose - intakeOpen;
+  const critTheta = result.i.clearance <= result.e.clearance ? result.i.theta : result.e.theta;
+  const shownTheta = playing ? animTheta : (autoCrit ? critTheta : theta);
+
+  // effective (post-VVT) events & overlap, in the user's reference convention
+  const tim = useMemo(() => {
+    const ci = cfg.ic, ce = cfg.ec;
+    const io = ci.centerline - ci.duration / 2;          // ATDC
+    const icl = ci.centerline + ci.duration / 2 - 180;    // ABDC
+    const eo = -180 - (ce.centerline - ce.duration / 2);  // BBDC
+    const ec = -(ce.centerline + ce.duration / 2);        // BTDC
+    const overlap = (ce.centerline + ce.duration / 2) - (ci.centerline - ci.duration / 2);
+    const lsa = (ci.centerline - ce.centerline) / 2;
+    return { io, ic: icl, eo, ec, overlap, lsa, durI: ci.duration, durE: ce.duration };
   }, [cfg]);
-  const lsa = (stock.intake.cl + stock.exhaust.cl) / 2;
 
   const setS = (path, v) => setStock((s) => {
-    const n = structuredClone(s);
-    const ks = path.split("."); let o = n;
+    const n = structuredClone(s); const ks = path.split("."); let o = n;
     for (let i = 0; i < ks.length - 1; i++) o = o[ks[i]];
     o[ks[ks.length - 1]] = v; return n;
   });
@@ -430,7 +467,7 @@ function App() {
   const applyPreset = (name) => {
     const p = PRESETS[name];
     setStock(p);
-    setMods({ deckMill: 0, gasket: p.gasket, pocket: p.pocket,
+    setMods({ deckMill: 0, gasket: p.gasket, intakePocket: p.pocketInt, exhaustPocket: p.pocketExh,
       intakeDia: p.intake.dia, exhaustDia: p.exhaust.dia, intakeAdvance: 0, exhaustRetard: 0 });
   };
 
@@ -467,8 +504,8 @@ function App() {
         <p style={{ color: C.inkSoft, fontSize: 13.5, margin: "0 0 18px", maxWidth: 760 }}>
           How close does a valve come to the piston through the overlap, and how do your
           changes move it relative to stock? Mill the deck, swap the gasket, fit bigger valves,
-          dial in cam advance/VTEC — the gap updates live. Directional model for comparison —
-          always confirm the real number with modelling clay.
+          deepen the reliefs, dial in cam timing/VTEC — the gap updates live across the full
+          720° cycle. Directional model for comparison — always confirm with modelling clay.
         </p>
 
         <div style={{ display: "grid", gridTemplateColumns: "minmax(320px, 1fr) minmax(420px, 1.25fr)", gap: 16, alignItems: "start" }}>
@@ -488,10 +525,12 @@ function App() {
                 <NumField label="Rod length" value={stock.rod} onChange={(v) => setS("rod", v)} unit="mm" />
                 <NumField label="Deck clearance" value={stock.deckClear} onChange={(v) => setS("deckClear", v)} unit="mm" step={0.05} />
                 <NumField label="Gasket (stock)" value={stock.gasket} onChange={(v) => setS("gasket", v)} unit="mm" step={0.05} />
-                <NumField label="Relief depth" value={stock.pocket} onChange={(v) => setS("pocket", v)} unit="mm" step={0.1} />
+                <NumField label="Relief — intake" value={stock.pocketInt} onChange={(v) => setS("pocketInt", v)} unit="mm" step={0.1} />
+                <NumField label="Relief — exhaust" value={stock.pocketExh} onChange={(v) => setS("pocketExh", v)} unit="mm" step={0.1} />
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-                {[["intake", "Intake", C.intake], ["exhaust", "Exhaust", C.exhaust]].map(([k, lbl, col]) => (
+                {[["intake", "Intake", C.intake, [["io", "IO (°ATDC)"], ["ic", "IC (°ABDC)"]]],
+                  ["exhaust", "Exhaust", C.exhaust, [["eo", "EO (°BBDC)"], ["ec", "EC (°BTDC)"]]]].map(([k, lbl, col, evs]) => (
                   <div key={k} style={{ border: `1px solid ${C.line}`, borderRadius: 10, padding: 10 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: col, marginBottom: 8 }}>{lbl} valve</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -499,14 +538,15 @@ function App() {
                       <NumField label="Head dia" value={stock[k].dia} onChange={(v) => setS(`${k}.dia`, v)} unit="mm" w={64} />
                       <NumField label="Seat recess" value={stock[k].recess} onChange={(v) => setS(`${k}.recess`, v)} unit="mm" step={0.1} w={64} />
                       <NumField label="Lift" value={stock[k].lift} onChange={(v) => setS(`${k}.lift`, v)} unit="mm" step={0.1} w={64} />
-                      <NumField label="Duration" value={stock[k].duration} onChange={(v) => setS(`${k}.duration`, v)} unit="°" w={64} />
-                      <NumField label={k === "intake" ? "ICL (ATDC)" : "ECL (BTDC)"} value={stock[k].cl} onChange={(v) => setS(`${k}.cl`, v)} unit="°" w={64} />
+                      <NumField label={evs[0][1]} value={stock[k][evs[0][0]]} onChange={(v) => setS(`${k}.${evs[0][0]}`, v)} unit="°" w={64} />
+                      <NumField label={evs[1][1]} value={stock[k][evs[1][0]]} onChange={(v) => setS(`${k}.${evs[1][0]}`, v)} unit="°" w={64} />
                     </div>
                   </div>
                 ))}
               </div>
-              <div style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 10, fontFamily: C.mono }}>
-                LSA {fmt(lsa, 1)}° · overlap ≈ {fmt(overlap, 0)}°
+              <div style={{ fontSize: 11.5, color: C.inkSoft, marginTop: 10, fontFamily: C.mono, lineHeight: 1.7 }}>
+                effective: IO {fmt(tim.io, 0)}° ATDC · IC {fmt(tim.ic, 0)}° ABDC · EO {fmt(tim.eo, 0)}° BBDC · EC {fmt(tim.ec, 0)}° BTDC<br />
+                dur {fmt(tim.durI, 0)}/{fmt(tim.durE, 0)}° · LSA {fmt(tim.lsa, 1)}° · overlap {fmt(tim.overlap, 0)}°
               </div>
             </Section>
 
@@ -520,7 +560,8 @@ function App() {
               <div style={grid(2)}>
                 <NumField label="Intake valve dia" value={mods.intakeDia} onChange={(v) => setM("intakeDia", v)} unit="mm" />
                 <NumField label="Exhaust valve dia" value={mods.exhaustDia} onChange={(v) => setM("exhaustDia", v)} unit="mm" />
-                <NumField label="Piston relief depth" value={mods.pocket} onChange={(v) => setM("pocket", v)} unit="mm" />
+                <NumField label="Intake relief depth" value={mods.intakePocket} onChange={(v) => setM("intakePocket", v)} unit="mm" />
+                <NumField label="Exhaust relief depth" value={mods.exhaustPocket} onChange={(v) => setM("exhaustPocket", v)} unit="mm" />
               </div>
             </Section>
 
@@ -573,27 +614,39 @@ function App() {
                 caution={THRESH.cautionExh} danger={THRESH.dangerExh} />
             </div>
 
-            <Section title="Cross-section" sub={`Schematic slice at ${fmt(shownTheta, 0)}° ${shownTheta < 0 ? "BTDC" : "ATDC"}${autoCrit ? " — the tightest moment" : ""}.`}>
+            <Section title="Cross-section"
+              sub={playing ? "Animating the full 720° cycle — watch the valves fire in time." :
+                `Slice at ${fmt(Math.abs(shownTheta), 0)}° ${shownTheta < 0 ? "BTDC" : "ATDC"}${autoCrit ? " — the tightest moment" : ""}.`}>
               <CrossSection cfg={cfg} theta={shownTheta} />
-              <div style={{ marginTop: 12 }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, marginBottom: 8, cursor: "pointer" }}>
-                  <input type="checkbox" checked={autoCrit} onChange={(e) => setAutoCrit(e.target.checked)} />
-                  Snap to the tightest crank angle
-                </label>
-                {!autoCrit && (
-                  <Slider label="Crank angle" value={theta} min={-70} max={70} step={1}
-                    onChange={(v) => setTheta(v)} unit="°" readout={`${theta >= 0 ? "+" : ""}${theta}° ${theta < 0 ? "BTDC" : "ATDC"}`} />
+              <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <button onClick={() => setPlaying((p) => !p)}
+                    style={{ fontSize: 13, fontWeight: 700, padding: "8px 16px", cursor: "pointer", borderRadius: 8,
+                      background: playing ? C.exhaust : C.accentDeep, color: "#fff", border: "none" }}>
+                    {playing ? "⏸ Pause" : "▶ Animate piston"}
+                  </button>
+                  {!playing && (
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, cursor: "pointer" }}>
+                      <input type="checkbox" checked={autoCrit} onChange={(e) => setAutoCrit(e.target.checked)} />
+                      Snap to the tightest crank angle
+                    </label>
+                  )}
+                </div>
+                {!playing && !autoCrit && (
+                  <Slider label="Crank angle" value={theta} min={-360} max={360} step={1}
+                    onChange={(v) => setTheta(v)} unit="°"
+                    readout={`${fmt(Math.abs(theta), 0)}° ${theta < 0 ? "BTDC" : "ATDC"}`} />
                 )}
               </div>
             </Section>
 
-            <Section title="Clearance through the overlap" sub="Solid = current, dashed = stock. Dashed orange/red lines mark the caution/interference thresholds.">
+            <Section title="Clearance through the overlap" sub="Solid = current, dashed = stock. Orange/red dashes are the caution/interference thresholds.">
               <ClearanceChart intakeCurve={result.intakeCurve} exhaustCurve={result.exhaustCurve}
-                stockIntake={result.stockIntakeCurve} stockExhaust={result.stockExhaustCurve} theta={shownTheta} />
+                stockIntake={result.stockIntakeCurve} stockExhaust={result.stockExhaustCurve} theta={clamp(shownTheta, -90, 90)} />
             </Section>
 
-            <Section title="Valve lift" sub="The active cam profile (high lobe when VTEC is engaged).">
-              <LiftChart intake={cfg.intake} exhaust={cfg.exhaust} />
+            <Section title="Valve lift — full 720° cycle" sub="Exhaust closes as intake opens across the overlap; they're a stroke apart, not simultaneous.">
+              <LiftChart intake={cfg.intake} exhaust={cfg.exhaust} theta={shownTheta} />
             </Section>
           </div>
         </div>
@@ -601,10 +654,10 @@ function App() {
         <p style={{ color: C.inkSoft, fontSize: 11.5, marginTop: 16, lineHeight: 1.6 }}>
           <strong style={{ color: C.ink }}>Model notes.</strong> Lobes are approximated as raised-cosine
           profiles; the piston follows an exact slider-crank. Clearance is the vertical gap between the
-          valve's piston-side edge and the relief floor beneath it. Valve diameter enters through the
-          rim drop (Δr·sin θ<sub>seat</sub>); the lateral piston-edge interference and any valve-to-valve
-          proximity are not modelled. Treat absolute numbers as directional and the <em>deviation from
-          stock</em> as the trustworthy signal — then clay it.
+          valve's piston-side edge and the relief floor beneath it (intake and exhaust reliefs set
+          separately). Valve diameter enters through the rim drop (Δr·sin θ<sub>seat</sub>); lateral
+          piston-edge interference and valve-to-valve proximity are not modelled. Treat absolute numbers
+          as directional and the <em>deviation from stock</em> as the trustworthy signal — then clay it.
         </p>
       </div>
     </div>
