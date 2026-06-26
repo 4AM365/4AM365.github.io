@@ -3,6 +3,10 @@
 Stable — no open handoff. Both `/kitchen` calculators are quality-driven and live.
 
 ## Calculator widgets — sync rules
+> New to widgets? Read [`widgets/README.md`](widgets/README.md) first — it covers
+> the general build/mount/embed pipeline. This section is only the per-widget
+> "how to ship a change" specifics.
+
 The two widgets use **different** setups right now:
 
 **focaccia** — sourced from the standalone `foccaciabot` repo as a git dependency
