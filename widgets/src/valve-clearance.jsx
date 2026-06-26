@@ -159,23 +159,52 @@ const DEFAULT_MODS = {
   intakeDia: 33, exhaustDia: 28, intakeAdvance: 0, exhaustRetard: 0,
 };
 
-const PRESETS = {
-  "Honda B16 (VTEC I4)": DEFAULT_STOCK,
-  "Toyota 2JZ-GTE (I6 turbo)": {
-    stroke: 86.0, rod: 142.0, deckClear: 0.40, gasket: 1.30,
-    pocketInt: 2.20, pocketExh: 2.20,
-    intake:  { angle: 21.5, dia: 33.5, recess: 1.3, lift: 8.7, io: 2, ic: 46 },
-    exhaust: { angle: 21.5, dia: 29.0, recess: 1.5, lift: 8.3, eo: 52, ec: -4 },
-    vtec: { intLift: 8.7, intDur: 224, exhLift: 8.3, exhDur: 236 }, // no VTEC, hi=stock
-  },
-  "Chevy LS (pushrod V8)": {
-    stroke: 92.0, rod: 154.0, deckClear: 0.25, gasket: 1.00,
-    pocketInt: 1.50, pocketExh: 1.50,
-    intake:  { angle: 15, dia: 54, recess: 1.0, lift: 13.5, io: 12, ic: 28 },
-    exhaust: { angle: 15, dia: 41.5, recess: 1.2, lift: 13.0, eo: 39.5, ec: 12.5 },
-    vtec: { intLift: 13.5, intDur: 196, exhLift: 13.0, exhDur: 207 },
-  },
+// ---- Common-cam presets ----------------------------------------------------
+// Cam cards quote advertised duration + centerline; we derive our seat-to-seat
+// event convention (IO °ATDC, IC °ABDC, EO °BBDC, EC °BTDC) from those.
+const camEvents = (clIn, durIn, clEx, durEx) => ({
+  io: clIn - durIn / 2,
+  ic: clIn + durIn / 2 - 180,
+  eo: clEx + durEx / 2 - 180,
+  ec: clEx - durEx / 2,
+});
+// Representative engine geometries the cams bolt into (directional, not exact).
+const GEO = {
+  j1:  { stroke: 71.5, rod: 138.6, deck: 0.50, gasket: 1.20, pocket: 2.0, angle: 21,   iDia: 34.0, eDia: 29.5, iRec: 1.3, eRec: 1.5 },
+  j2:  { stroke: 86.0, rod: 142.0, deck: 0.40, gasket: 1.30, pocket: 2.2, angle: 21.5, iDia: 33.5, eDia: 29.0, iRec: 1.3, eRec: 1.5 },
+  j2v: { stroke: 86.0, rod: 142.0, deck: 0.40, gasket: 1.20, pocket: 2.0, angle: 21.5, iDia: 33.5, eDia: 29.0, iRec: 1.3, eRec: 1.5 },
+  k20: { stroke: 86.0, rod: 139.0, deck: 0.40, gasket: 0.70, pocket: 1.8, angle: 23,   iDia: 35.0, eDia: 30.0, iRec: 1.0, eRec: 1.2 },
 };
+// Build a full stock config from a geometry + headline cam spec (lift/dur/CL).
+function mkCam(geo, c) {
+  const e = camEvents(c.iCL, c.iDur, c.eCL, c.eDur);
+  return {
+    stroke: geo.stroke, rod: geo.rod, deckClear: geo.deck, gasket: geo.gasket,
+    pocketInt: geo.pocket, pocketExh: geo.pocket,
+    intake:  { angle: geo.angle, dia: geo.iDia, recess: geo.iRec, lift: c.iLift, io: e.io, ic: e.ic },
+    exhaust: { angle: geo.angle, dia: geo.eDia, recess: geo.eRec, lift: c.eLift, eo: e.eo, ec: e.ec },
+    vtec: { intLift: c.iLift, intDur: c.iDur, exhLift: c.eLift, exhDur: c.eDur }, // no 2nd lobe
+  };
+}
+
+const PRESET_GROUPS = [
+  { group: "Engine baseline", items: {
+    "Honda B16 — VTEC I4": DEFAULT_STOCK,
+    "Toyota 2JZ-GTE — stockish": mkCam(GEO.j2, { iLift: 8.7, iDur: 224, iCL: 112, eLift: 8.3, eDur: 228, eCL: 116 }),
+    "Chevy LS — stockish": mkCam({ stroke: 92, rod: 154, deck: 0.25, gasket: 1.0, pocket: 1.5, angle: 15, iDia: 54, eDia: 41.5, iRec: 1.0, eRec: 1.2 },
+      { iLift: 13.5, iDur: 196, iCL: 110, eLift: 13.0, eDur: 207, eCL: 116 }),
+  }},
+  { group: "Brian Crower", items: {
+    "1JZ-GTE Stage 3 — BC0332": mkCam(GEO.j1,  { iLift: 9.52, iDur: 272, iCL: 110, eLift: 9.65, eDur: 272, eCL: 118 }),
+    "2JZGE VVTi Stage 2 — BC0311": mkCam(GEO.j2v, { iLift: 8.74, iDur: 264, iCL: 110, eLift: 8.74, eDur: 264, eCL: 118 }),
+    "K20A2/Z3 Stage 2 — BC0042-2": mkCam(GEO.k20, { iLift: 13.34, iDur: 304, iCL: 101, eLift: 11.99, eDur: 300, eCL: 109 }),
+  }},
+  { group: "GSC Power-Division — 2JZ-GTE", items: {
+    "GSC S1 — billet": mkCam(GEO.j2, { iLift: 9.90, iDur: 269, iCL: 108, eLift: 9.90, eDur: 269, eCL: 114 }),
+    "GSC S2 — billet": mkCam(GEO.j2, { iLift: 10.20, iDur: 274, iCL: 109, eLift: 10.20, eDur: 274, eCL: 119 }),
+  }},
+];
+const PRESETS = Object.assign({}, ...PRESET_GROUPS.map((g) => g.items));
 
 // Safe-minimum guidance (mm). Exhaust runs hotter and stretches, so it wants more.
 const THRESH = { cautionInt: 1.3, dangerInt: 0.9, cautionExh: 1.5, dangerExh: 1.0 };
@@ -332,46 +361,57 @@ function LiftChart({ intake, exhaust, theta }) {
 // =============================================================================
 // Cross-section — a schematic slice at the selected crank angle
 // =============================================================================
+// Isometric slice: one px-per-mm scale for both axes (fit to the bore width), so
+// valve heads and the canted, valve-angle piston reliefs are drawn to scale.
 function CrossSection({ cfg, theta }) {
   const C = useC();
-  const pp = 7.5;            // px per mm; this is a zoomed view of the bore top
-  const W = 360, H = 360;
-  const yDeck = 80;
-  const bore = { l: 58, r: 302, center: 180 };
-  const seatI = 132, seatE = 228;
+  const W = 360, H = 360, marginX = 22, headTop = 18, headH = 26, labelB = 30;
+  const iDia = cfg.intake.dia, eDia = cfg.exhaust.dia;
+  const span = iDia + 4 + eDia;           // the two valves, 4mm between their edges
+  const boreW = span + 12;                 // a little wall clearance each side (mm)
+  const pp = (W - 2 * marginX) / boreW;    // isometric scale, fit bore to width
+  const cx = W / 2, yDeck = headTop + headH;
+  const X = (mm) => cx + mm * pp;          // chamber-centered x (mm) → px
+  const Y = (depth) => yDeck + depth * pp; // depth below deck (mm) → px
+  const xI = -span / 2 + iDia / 2, xE = span / 2 - eDia / 2;
 
-  const gapPH = cfg.block.deckClear + cfg.block.gasket + pistonDescent(theta, cfg.block.stroke, cfg.block.rod);
-  const pistonY = yDeck + gapPH * pp;
+  const pistonDepth = cfg.block.deckClear + cfg.block.gasket + pistonDescent(theta, cfg.block.stroke, cfg.block.rod);
+  const pistonY = Y(pistonDepth);
+  const boreL = X(-boreW / 2), boreR = X(boreW / 2);
 
-  const mkValve = (seatX, cam, tiltSign) => {
+  const mkValve = (xc, cam, tiltSign) => {
     const lift = valveLift(theta, cam.centerline, cam.duration, cam.maxLift);
     const drop = valveDrop(lift, cam);
-    const faceR = clamp((cam.dia / 2) * pp * 0.42, 10, 40);
-    return { lift, drop, tilt: tiltSign * cam.angle, faceR, seatX, pocket: cam.pocket,
-      axialPx: (drop * pp) / Math.cos(rad(cam.angle)), faceCenterY: yDeck + drop * pp };
+    return { lift, drop, tilt: tiltSign * cam.angle, xc, dia: cam.dia, pocket: cam.pocket,
+      faceR: (cam.dia / 2) * pp, axialPx: (drop * pp) / Math.cos(rad(cam.angle)), faceCenterY: Y(drop),
+      clear: clearanceAt(theta, cfg.block, cam) };
   };
-  const vi = mkValve(seatI, cfg.intake, -1);
-  const ve = mkValve(seatE, cfg.exhaust, +1);
-  const clearI = clearanceAt(theta, cfg.block, cfg.intake);
-  const clearE = clearanceAt(theta, cfg.block, cfg.exhaust);
+  const vi = mkValve(xI, cfg.intake, -1);
+  const ve = mkValve(xE, cfg.exhaust, +1);
 
-  const dim = (x, y1, y2, val, color) => (y2 > y1 + 4 && y1 > yDeck - 2 && y2 < H) ? (
-    <g>
-      <line x1={x} y1={y1} x2={x} y2={y2} stroke={color} strokeWidth="1.2" markerEnd="url(#ar)" markerStart="url(#ar)" />
-      <rect x={x + 4} y={(y1 + y2) / 2 - 8} width="52" height="16" rx="3" fill={C.panel} stroke={color} strokeWidth="0.7" />
-      <text x={x + 30} y={(y1 + y2) / 2 + 3.5} textAnchor="middle" fontSize="10" fill={color} fontFamily={C.mono}>{fmt(val)}mm</text>
-    </g>
-  ) : null;
-
-  const Valve = ({ v, color, label }) => (
-    <g transform={`translate(${v.seatX} ${yDeck}) rotate(${v.tilt})`}>
-      <line x1="0" y1="-48" x2="0" y2={v.axialPx} stroke={color} strokeWidth="3.5" strokeLinecap="round" opacity="0.85" />
-      <rect x="-3.2" y="-48" width="6.4" height="8" rx="2" fill={color} />
-      <path d={`M${-v.faceR} ${v.axialPx} L${v.faceR} ${v.axialPx} L${v.faceR * 0.62} ${v.axialPx + 7} L${-v.faceR * 0.62} ${v.axialPx + 7} Z`}
-        fill={color} opacity="0.9" />
-      <text x="0" y="-54" textAnchor="middle" fontSize="10" fill={color} fontFamily={C.mono} fontWeight="600">{label}</text>
+  // canted, to-scale relief: a valve-diameter-wide, pocket-deep slot cut into the
+  // crown along the valve axis (rotate by the same tilt as the valve).
+  const Relief = ({ v }) => (
+    <g transform={`translate(${X(v.xc)} ${pistonY}) rotate(${v.tilt})`}>
+      <rect x={-v.faceR} y={0} width={v.faceR * 2} height={v.pocket * pp} fill={C.bg} stroke={C.piston} strokeWidth="1.5" opacity="0.9" />
     </g>
   );
+  const Valve = ({ v, color, label }) => (
+    <g transform={`translate(${X(v.xc)} ${yDeck}) rotate(${v.tilt})`}>
+      <line x1="0" y1="-46" x2="0" y2={v.axialPx} stroke={color} strokeWidth="3.5" strokeLinecap="round" opacity="0.85" />
+      <rect x="-3.2" y="-46" width="6.4" height="8" rx="2" fill={color} />
+      <path d={`M${-v.faceR} ${v.axialPx} L${v.faceR} ${v.axialPx} L${v.faceR - 5} ${v.axialPx + 6} L${-v.faceR + 5} ${v.axialPx + 6} Z`}
+        fill={color} opacity="0.92" />
+      <text x="0" y="-52" textAnchor="middle" fontSize="10" fill={color} fontFamily={C.mono} fontWeight="600">{label}</text>
+    </g>
+  );
+  const dim = (x, yTop, len, color) => (len > 4 && yTop > yDeck - 2 && yTop + len < H) ? (
+    <g>
+      <line x1={x} y1={yTop} x2={x} y2={yTop + len} stroke={color} strokeWidth="1.2" markerEnd="url(#ar)" markerStart="url(#ar)" />
+      <rect x={x + 4} y={yTop + len / 2 - 8} width="50" height="16" rx="3" fill={C.panel} stroke={color} strokeWidth="0.7" />
+      <text x={x + 29} y={yTop + len / 2 + 3.5} textAnchor="middle" fontSize="10" fill={color} fontFamily={C.mono}>{fmt(color === C.intake ? vi.clear : ve.clear)}mm</text>
+    </g>
+  ) : null;
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", background: C.bg, borderRadius: 12 }}>
@@ -379,35 +419,30 @@ function CrossSection({ cfg, theta }) {
         <marker id="ar" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto">
           <path d="M1 1 L6 3.5 L1 6" fill="none" stroke="currentColor" strokeWidth="1.1" />
         </marker>
-        <clipPath id="bore"><rect x={bore.l} y={yDeck} width={bore.r - bore.l} height={H - yDeck} /></clipPath>
+        <clipPath id="bore"><rect x={boreL} y={yDeck} width={boreR - boreL} height={H - yDeck} /></clipPath>
       </defs>
 
-      {/* cylinder head */}
-      <rect x={bore.l - 12} y={20} width={bore.r - bore.l + 24} height={yDeck - 20} fill={C.panel2} stroke={C.line} />
-      <text x={bore.center} y={36} textAnchor="middle" fontSize="10.5" fill={C.inkSoft} fontFamily={C.mono}>cylinder head</text>
-      <rect x={bore.l} y={yDeck} width={bore.r - bore.l} height={Math.max(2, cfg.block.gasket * pp)} fill={C.accentDeep} opacity="0.55" />
-      <line x1={bore.l} y1={yDeck} x2={bore.r} y2={yDeck} stroke={C.accent} strokeWidth="1.5" />
-      <line x1={bore.l} y1={yDeck} x2={bore.l} y2={H} stroke={C.line} strokeWidth="2" />
-      <line x1={bore.r} y1={yDeck} x2={bore.r} y2={H} stroke={C.line} strokeWidth="2" />
+      <rect x={boreL - 12} y={headTop - 4} width={boreR - boreL + 24} height={headH + 4} fill={C.panel2} stroke={C.line} />
+      <text x={cx} y={headTop + 11} textAnchor="middle" fontSize="10" fill={C.inkSoft} fontFamily={C.mono}>cylinder head · {fmt(pp, 1)} px/mm (to scale)</text>
+      <rect x={boreL} y={yDeck} width={boreR - boreL} height={Math.max(2, cfg.block.gasket * pp)} fill={C.accentDeep} opacity="0.55" />
+      <line x1={boreL} y1={yDeck} x2={boreR} y2={yDeck} stroke={C.accent} strokeWidth="1.5" />
+      <line x1={boreL} y1={yDeck} x2={boreL} y2={H} stroke={C.line} strokeWidth="2" />
+      <line x1={boreR} y1={yDeck} x2={boreR} y2={H} stroke={C.line} strokeWidth="2" />
 
-      {/* piston (clipped to the bore so it slides cleanly out the bottom) */}
       <g clipPath="url(#bore)">
-        <rect x={bore.l} y={pistonY} width={bore.r - bore.l} height={Math.max(0, H - pistonY)} fill={C.piston} opacity="0.18" />
-        {[vi, ve].map((v, i) => (
-          <rect key={i} x={v.seatX - 15} y={pistonY} width={30} height={v.pocket * pp} rx="4" fill={C.piston} opacity="0.30" />
-        ))}
-        {pistonY < H && <line x1={bore.l} y1={pistonY} x2={bore.r} y2={pistonY} stroke={C.piston} strokeWidth="2.5" />}
+        <rect x={boreL} y={pistonY} width={boreR - boreL} height={Math.max(0, H - pistonY)} fill={C.piston} opacity="0.18" />
+        {pistonY < H && <line x1={boreL} y1={pistonY} x2={boreR} y2={pistonY} stroke={C.piston} strokeWidth="2.5" />}
+        <Relief v={vi} /><Relief v={ve} />
         <Valve v={vi} color={C.intake} label="IN" />
         <Valve v={ve} color={C.exhaust} label="EX" />
-        <g style={{ color: C.intake }}>{dim(seatI - 6, vi.faceCenterY, pistonY + vi.pocket * pp, clearI, C.intake)}</g>
-        <g style={{ color: C.exhaust }}>{dim(seatE - 6, ve.faceCenterY, pistonY + ve.pocket * pp, clearE, C.exhaust)}</g>
+        {dim(X(vi.xc) - vi.faceR - 4, vi.faceCenterY, vi.clear * pp, C.intake)}
+        {dim(X(ve.xc) + 4, ve.faceCenterY, ve.clear * pp, C.exhaust)}
       </g>
 
-      {/* live clearance readouts (always visible, even when the piston is off-view) */}
-      <text x={bore.l + 4} y={H - 22} fontSize="11" fill={C.intake} fontFamily={C.mono}>IN {fmt(clearI)}mm</text>
-      <text x={bore.r - 4} y={H - 22} textAnchor="end" fontSize="11" fill={C.exhaust} fontFamily={C.mono}>EX {fmt(clearE)}mm</text>
-      <text x={bore.center} y={H - 6} textAnchor="middle" fontSize="9.5" fill={C.inkSoft} fontFamily={C.mono}>
-        {fmt(Math.abs(theta), 0)}° {theta < 0 ? "BTDC" : "ATDC"} · piston {fmt(pistonDescent(theta, cfg.block.stroke, cfg.block.rod))}mm down
+      <text x={boreL + 2} y={H - 22} fontSize="11" fill={C.intake} fontFamily={C.mono}>IN {fmt(vi.clear)}mm</text>
+      <text x={boreR - 2} y={H - 22} textAnchor="end" fontSize="11" fill={C.exhaust} fontFamily={C.mono}>EX {fmt(ve.clear)}mm</text>
+      <text x={cx} y={H - 6} textAnchor="middle" fontSize="9.5" fill={C.inkSoft} fontFamily={C.mono}>
+        {fmt(Math.abs(theta), 0)}° {theta < 0 ? "BTDC" : "ATDC"} · piston {fmt(pistonDepth - cfg.block.deckClear - cfg.block.gasket)}mm down
       </text>
     </svg>
   );
@@ -503,11 +538,15 @@ function App() {
   });
   const setM = (k, v) => setMods((m) => ({ ...m, [k]: v }));
 
+  const [preset, setPreset] = useState("Honda B16 — VTEC I4");
   const applyPreset = (name) => {
     const p = PRESETS[name];
+    if (!p) return;
+    setPreset(name);
     setStock(p);
     setMods({ deckMill: 0, gasket: p.gasket, intakePocket: p.pocketInt, exhaustPocket: p.pocketExh,
       intakeDia: p.intake.dia, exhaustDia: p.exhaust.dia, intakeAdvance: 0, exhaustRetard: 0 });
+    setVtecOn(p === DEFAULT_STOCK); // only the B16 baseline carries a real VTEC lobe
   };
 
   const ResultCard = ({ title, color, cur, stk, caution, danger }) => {
@@ -555,14 +594,18 @@ function App() {
           {/* ---- LEFT: inputs ---- */}
           <div>
             <Section title="Stock baseline" sub="The factory engine — your yardstick.">
-              <div style={{ marginBottom: 12 }}>
-                <span style={{ fontSize: 12, color: C.inkSoft }}>Preset: </span>
-                {Object.keys(PRESETS).map((n) => (
-                  <button key={n} onClick={() => applyPreset(n)}
-                    style={{ fontSize: 11, margin: "0 6px 6px 0", padding: "5px 9px", cursor: "pointer",
-                      background: C.panel2, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 7 }}>{n}</button>
-                ))}
-              </div>
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 12, fontSize: 12, color: C.inkSoft }}>
+                <span>Engine / common-cam preset</span>
+                <select value={preset} onChange={(e) => applyPreset(e.target.value)}
+                  style={{ background: C.bg, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 7,
+                    padding: "7px 9px", fontSize: 13, fontFamily: "inherit", cursor: "pointer" }}>
+                  {PRESET_GROUPS.map((g) => (
+                    <optgroup key={g.group} label={g.group}>
+                      {Object.keys(g.items).map((n) => <option key={n} value={n}>{n}</option>)}
+                    </optgroup>
+                  ))}
+                </select>
+              </label>
               <div style={grid(2)}>
                 <NumField label="Stroke" value={stock.stroke} onChange={(v) => setS("stroke", v)} unit="mm" />
                 <NumField label="Rod length" value={stock.rod} onChange={(v) => setS("rod", v)} unit="mm" />
