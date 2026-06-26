@@ -3,7 +3,7 @@
 // GENERATED from index.html by tools/sync-widget.mjs. Do not edit by hand —
 // edit index.html (the canonical standalone app) and re-run the sync.
 
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, useContext } from "react";
 
 // =============================================================================
 // Piston-to-Valve (P2V) clearance — physics
@@ -186,18 +186,31 @@ function statusFor(clear, caution, danger) {
 }
 
 // =============================================================================
-// Theme
+// Theme — light & dark, inherited from the host Quartz blog (`saved-theme` /
+// `themechange`) like the focaccia calc; standalone falls back to the OS
+// preference. Same keys in both palettes; mono is shared.
 // =============================================================================
-const C = {
-  bg: "#14101e", panel: "#1e1830", panel2: "#272040", ink: "#f5f3fc",
-  inkSoft: "#9b95b5", line: "#3a3358", accent: "#a78bfa", accentDeep: "#7c3aed",
-  intake: "#60a5fa", exhaust: "#f87171", piston: "#cbb58b", mono: "'IBM Plex Mono', ui-monospace, monospace",
+const MONO = "'IBM Plex Mono', ui-monospace, monospace";
+const THEMES = {
+  dark: {
+    bg: "#14101e", panel: "#1e1830", panel2: "#272040", ink: "#f5f3fc",
+    inkSoft: "#9b95b5", line: "#3a3358", accent: "#a78bfa", accentDeep: "#7c3aed",
+    intake: "#60a5fa", exhaust: "#f87171", piston: "#cbb58b", mono: MONO,
+  },
+  light: {
+    bg: "#f7f6fb", panel: "#ffffff", panel2: "#f1eefa", ink: "#1a1730",
+    inkSoft: "#6b6688", line: "#d8d2ec", accent: "#7c3aed", accentDeep: "#6d28d9",
+    intake: "#2563eb", exhaust: "#dc2626", piston: "#9a7730", mono: MONO,
+  },
 };
+const ThemeCtx = React.createContext(THEMES.dark);
+const useC = () => useContext(ThemeCtx);
 
 // =============================================================================
 // Small UI pieces
 // =============================================================================
 function NumField({ label, value, onChange, step = 0.1, min, max, unit, w = 88 }) {
+  const C = useC();
   return (
     <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 12, color: C.inkSoft }}>
       <span>{label}</span>
@@ -212,23 +225,26 @@ function NumField({ label, value, onChange, step = 0.1, min, max, unit, w = 88 }
   );
 }
 
-function Slider({ label, value, min, max, step, onChange, unit, color = C.accent, readout, disabled }) {
+function Slider({ label, value, min, max, step, onChange, unit, color, readout, disabled }) {
+  const C = useC();
+  const col = color || C.accent;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4, opacity: disabled ? 0.45 : 1 }}>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
         <span style={{ color: C.ink }}>{label}</span>
-        <span style={{ fontFamily: C.mono, color, fontWeight: 600 }}>
+        <span style={{ fontFamily: C.mono, color: col, fontWeight: 600 }}>
           {readout != null ? readout : `${value}${unit || ""}`}
         </span>
       </div>
       <input type="range" min={min} max={max} step={step} value={value} disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
-        style={{ width: "100%", accentColor: color }} />
+        style={{ width: "100%", accentColor: col }} />
     </div>
   );
 }
 
 function Section({ title, sub, children }) {
+  const C = useC();
   return (
     <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16, marginBottom: 14 }}>
       <div style={{ marginBottom: 12 }}>
@@ -246,6 +262,7 @@ const grid = (cols) => ({ display: "grid", gridTemplateColumns: `repeat(${cols},
 // Charts (hand-rolled SVG — no chart lib)
 // =============================================================================
 function ClearanceChart({ intakeCurve, exhaustCurve, stockIntake, stockExhaust, theta }) {
+  const C = useC();
   const W = 520, H = 230, padL = 44, padR = 12, padT = 12, padB = 28;
   const xs = intakeCurve.map((p) => p.theta);
   const xMin = Math.min(...xs), xMax = Math.max(...xs);
@@ -281,6 +298,7 @@ function ClearanceChart({ intakeCurve, exhaustCurve, stockIntake, stockExhaust, 
 // Full 720° valve-event view: exhaust on the up-stroke into overlap, intake on
 // the down-stroke out of it. Marks both TDCs and both BDCs so the timing reads.
 function LiftChart({ intake, exhaust, theta }) {
+  const C = useC();
   const W = 520, H = 168, padL = 30, padR = 12, padT = 12, padB = 26;
   const data = [];
   for (let t = -360; t <= 360; t += 3) {
@@ -315,6 +333,7 @@ function LiftChart({ intake, exhaust, theta }) {
 // Cross-section — a schematic slice at the selected crank angle
 // =============================================================================
 function CrossSection({ cfg, theta }) {
+  const C = useC();
   const pp = 7.5;            // px per mm; this is a zoomed view of the bore top
   const W = 360, H = 360;
   const yDeck = 80;
@@ -408,6 +427,26 @@ function App() {
   const [playing, setPlaying] = useState(false);
   const [animTheta, setAnimTheta] = useState(0);
 
+  // Light/dark inherits from the host Quartz blog (saved-theme / themechange);
+  // standalone falls back to the OS preference. `embedded` hides the widget's own
+  // title block when it's mounted inside a blog page (the page supplies the title).
+  const [dark, setDark] = useState(() => {
+    try {
+      const s = document.documentElement.getAttribute("saved-theme");
+      if (s) return s === "dark";
+      return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    } catch { return true; }
+  });
+  const C = dark ? THEMES.dark : THEMES.light;
+  const rootRef = useRef(null);
+  const [embedded, setEmbedded] = useState(false);
+  useEffect(() => {
+    setEmbedded(!!(rootRef.current && rootRef.current.closest("[data-widget]")));
+    const onTheme = (e) => { if (e && e.detail && e.detail.theme) setDark(e.detail.theme === "dark"); };
+    document.addEventListener("themechange", onTheme);
+    return () => document.removeEventListener("themechange", onTheme);
+  }, []);
+
   const vtecActive = vtecOn && rpm >= vtecRpm;
   const cfg = useMemo(() => buildConfig(stock, mods, vtecActive), [stock, mods, vtecActive]);
   const stockCfg = useMemo(() => stockConfig(stock), [stock]);
@@ -497,16 +536,20 @@ function App() {
   };
 
   return (
-    <div style={{ background: C.bg, color: C.ink, minHeight: "100vh", padding: "22px 18px",
+    <ThemeCtx.Provider value={C}>
+    <div ref={rootRef} style={{ background: C.bg, color: C.ink, colorScheme: dark ? "dark" : "light",
+      minHeight: embedded ? "auto" : "100vh", padding: embedded ? "4px 0 0" : "22px 18px",
       fontFamily: "system-ui, -apple-system, sans-serif" }}>
       <div style={{ maxWidth: 1180, margin: "0 auto" }}>
-        <h1 style={{ fontSize: 24, margin: "0 0 2px" }}>Piston-to-Valve Clearance Calculator</h1>
-        <p style={{ color: C.inkSoft, fontSize: 13.5, margin: "0 0 18px", maxWidth: 760 }}>
-          How close does a valve come to the piston through the overlap, and how do your
-          changes move it relative to stock? Mill the deck, swap the gasket, fit bigger valves,
-          deepen the reliefs, dial in cam timing/VTEC — the gap updates live across the full
-          720° cycle. Directional model for comparison — always confirm with modelling clay.
-        </p>
+        {!embedded && <h1 style={{ fontSize: 24, margin: "0 0 2px" }}>Piston-to-Valve Clearance Calculator</h1>}
+        {!embedded && (
+          <p style={{ color: C.inkSoft, fontSize: 13.5, margin: "0 0 18px", maxWidth: 760 }}>
+            How close does a valve come to the piston through the overlap, and how do your
+            changes move it relative to stock? Mill the deck, swap the gasket, fit bigger valves,
+            deepen the reliefs, dial in cam timing/VTEC — the gap updates live across the full
+            720° cycle. Directional model for comparison — always confirm with modelling clay.
+          </p>
+        )}
 
         <div style={{ display: "grid", gridTemplateColumns: "minmax(320px, 1fr) minmax(420px, 1.25fr)", gap: 16, alignItems: "start" }}>
           {/* ---- LEFT: inputs ---- */}
@@ -661,6 +704,7 @@ function App() {
         </p>
       </div>
     </div>
+    </ThemeCtx.Provider>
   );
 }
 
