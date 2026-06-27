@@ -399,13 +399,14 @@ function CrossSection({ cfg, theta }) {
   // whose hypotenuse lies flat along the piston crown. The base (floor) is
   // perpendicular to the valve stem (parallel to the valve face) and the adjacent
   // leg is parallel to the stem, meeting at the right angle below the crown. A
-  // flat hypotenuse fixes the aspect ratio, so we size it so the adjacent leg
-  // equals the relief depth; the base is then depth·cot(angle).
+  // flat hypotenuse fixes the aspect ratio (small angle = valve angle), so we
+  // scale it so the base (floor) leg = the valve width; the adjacent leg is then
+  // width·tan(angle). (The clearance math still uses the true relief depth.)
   const Relief = ({ v }) => {
     const s = v.tilt < 0 ? -1 : 1;
     const a = rad(Math.max(1, Math.abs(v.tilt)));
     const tan = Math.tan(a), cot = 1 / tan;
-    const P = v.pocket * pp * Math.cos(a);            // altitude → adjacent leg = relief depth
+    const P = v.dia * pp * Math.sin(a);              // altitude → base (floor) leg = valve width
     const cX = X(v.xc) - s * P * (tan - cot) / 2;     // center the opening under the valve
     const Ax = cX - s * P * cot;                      // floor lip (base ⊥ stem)
     const Bx = cX + s * P * tan;                      // wall lip (adjacent ∥ stem)
