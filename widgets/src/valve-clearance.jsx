@@ -395,11 +395,18 @@ function CrossSection({ cfg, theta }) {
 
   // canted, to-scale relief: a valve-diameter-wide, pocket-deep slot cut into the
   // crown along the valve axis (rotate by the same tilt as the valve).
-  const Relief = ({ v }) => (
-    <g transform={`translate(${X(v.xc)} ${pistonY}) rotate(${v.tilt})`}>
-      <rect x={-v.faceR} y={0} width={v.faceR * 2} height={v.pocket * pp} fill={C.bg} stroke={C.piston} strokeWidth="1.5" opacity="0.9" />
-    </g>
-  );
+  // The relief opens flush along the (flat) piston crown and cants down into the
+  // piston at the valve angle — a parallelogram: horizontal top edge on the crown
+  // line, side walls parallel to the valve axis.
+  const Relief = ({ v }) => {
+    const r = v.faceR, h = v.pocket * pp, dx = h * Math.tan(rad(v.tilt));
+    const pts = `${-r},0 ${r},0 ${r - dx},${h} ${-r - dx},${h}`;
+    return (
+      <g transform={`translate(${X(v.xc)} ${pistonY})`}>
+        <polygon points={pts} fill={C.bg} stroke={C.piston} strokeWidth="1.5" opacity="0.9" />
+      </g>
+    );
+  };
   const Valve = ({ v, color, label }) => (
     <g transform={`translate(${X(v.xc)} ${yDeck}) rotate(${v.tilt})`}>
       <line x1="0" y1="-46" x2="0" y2={v.axialPx} stroke={color} strokeWidth="3.5" strokeLinecap="round" opacity="0.85" />
