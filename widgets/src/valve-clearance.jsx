@@ -119,14 +119,14 @@ function buildConfig(stock, mods, vtecActive) {
   const ec = exhaustCam(stock.exhaust, mods.exhaustRetard);
   const intake = {
     angle: stock.intake.angle, dia: mods.intakeDia, diaStock: stock.intake.dia,
-    recess: stock.intake.recess, pocket: mods.intakePocket,
+    recess: stock.intake.recess, pocket: stock.pocketInt, // piston relief is a fixed piston property
     maxLift: vtecActive ? stock.vtec.intLift : stock.intake.lift,
     duration: vtecActive ? stock.vtec.intDur : ic.duration,
     centerline: ic.centerline,
   };
   const exhaust = {
     angle: stock.exhaust.angle, dia: mods.exhaustDia, diaStock: stock.exhaust.dia,
-    recess: stock.exhaust.recess, pocket: mods.exhaustPocket,
+    recess: stock.exhaust.recess, pocket: stock.pocketExh,
     maxLift: vtecActive ? stock.vtec.exhLift : stock.exhaust.lift,
     duration: vtecActive ? stock.vtec.exhDur : ec.duration,
     centerline: ec.centerline,
@@ -135,10 +135,11 @@ function buildConfig(stock, mods, vtecActive) {
 }
 
 // The untouched factory engine — the yardstick everything is measured against.
+// (Relief depth lives on `stock`, so it's shared by both configs: changing it
+// moves the real clearance rather than only the hidden baseline.)
 function stockConfig(stock) {
   return buildConfig(stock, {
     deckMill: 0, gasket: stock.gasket,
-    intakePocket: stock.pocketInt, exhaustPocket: stock.pocketExh,
     intakeDia: stock.intake.dia, exhaustDia: stock.exhaust.dia,
     intakeAdvance: 0, exhaustRetard: 0,
   }, false);
@@ -155,7 +156,7 @@ const DEFAULT_STOCK = {
   vtec: { intLift: 11.5, intDur: 252, exhLift: 10.5, exhDur: 248 },
 };
 const DEFAULT_MODS = {
-  deckMill: 0, gasket: 0.70, intakePocket: 2.00, exhaustPocket: 2.00,
+  deckMill: 0, gasket: 0.70,
   intakeDia: 33, exhaustDia: 28, intakeAdvance: 0, exhaustRetard: 0,
 };
 
@@ -547,7 +548,7 @@ function App() {
     if (!p) return;
     setPreset(name);
     setStock(p);
-    setMods({ deckMill: 0, gasket: p.gasket, intakePocket: p.pocketInt, exhaustPocket: p.pocketExh,
+    setMods({ deckMill: 0, gasket: p.gasket,
       intakeDia: p.intake.dia, exhaustDia: p.exhaust.dia, intakeAdvance: 0, exhaustRetard: 0 });
     setVtecOn(p === DEFAULT_STOCK); // only the B16 baseline carries a real VTEC lobe
   };
@@ -649,8 +650,9 @@ function App() {
               <div style={grid(2)}>
                 <NumField label="Intake valve dia" value={mods.intakeDia} onChange={(v) => setM("intakeDia", v)} unit="mm" />
                 <NumField label="Exhaust valve dia" value={mods.exhaustDia} onChange={(v) => setM("exhaustDia", v)} unit="mm" />
-                <NumField label="Intake relief depth" value={mods.intakePocket} onChange={(v) => setM("intakePocket", v)} unit="mm" />
-                <NumField label="Exhaust relief depth" value={mods.exhaustPocket} onChange={(v) => setM("exhaustPocket", v)} unit="mm" />
+              </div>
+              <div style={{ fontSize: 11, color: C.inkSoft, marginTop: 8 }}>
+                Piston valve-relief depth is set per side under <em>Stock baseline</em> — it drives the clearance directly.
               </div>
             </Section>
 
