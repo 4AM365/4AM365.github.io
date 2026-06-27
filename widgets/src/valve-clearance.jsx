@@ -395,17 +395,22 @@ function CrossSection({ cfg, theta }) {
 
   // canted, to-scale relief: a valve-diameter-wide, pocket-deep slot cut into the
   // crown along the valve axis (rotate by the same tilt as the valve).
-  // The relief opens flush along the (flat) piston crown and cants down into the
-  // piston at the valve angle — a parallelogram: horizontal top edge on the crown
-  // line, side walls parallel to the valve axis.
+  // A valve relief is a fly-cut at the valve angle — in section a right triangle:
+  // the hypotenuse lies along the (flat) piston crown, the base (floor) is
+  // perpendicular to the valve stem (parallel to the valve face), and the adjacent
+  // leg is parallel to the stem, meeting the base at the right angle. Vertical
+  // depth (the altitude to the crown) is the relief depth; the opening width and
+  // cant follow from the valve angle.
   const Relief = ({ v }) => {
-    const r = v.faceR, h = v.pocket * pp, dx = h * Math.tan(rad(v.tilt));
-    const pts = `${-r},0 ${r},0 ${r - dx},${h} ${-r - dx},${h}`;
-    return (
-      <g transform={`translate(${X(v.xc)} ${pistonY})`}>
-        <polygon points={pts} fill={C.bg} stroke={C.piston} strokeWidth="1.5" opacity="0.9" />
-      </g>
-    );
+    const P = v.pocket * pp;                         // vertical depth (altitude)
+    const s = v.tilt < 0 ? -1 : 1;                   // which way the valve leans
+    const a = rad(Math.max(1, Math.abs(v.tilt)));
+    const tan = Math.tan(a), cot = 1 / tan;
+    const cX = X(v.xc) - s * P * (tan - cot) / 2;     // deep right-angle corner x
+    const Ax = cX - s * P * cot;                      // floor lip (base ⊥ stem)
+    const Bx = cX + s * P * tan;                      // wall lip (adjacent ∥ stem)
+    const pts = `${Ax.toFixed(1)},${pistonY.toFixed(1)} ${Bx.toFixed(1)},${pistonY.toFixed(1)} ${cX.toFixed(1)},${(pistonY + P).toFixed(1)}`;
+    return <polygon points={pts} fill={C.bg} stroke={C.piston} strokeWidth="1.5" opacity="0.9" />;
   };
   const Valve = ({ v, color, label }) => (
     <g transform={`translate(${X(v.xc)} ${yDeck}) rotate(${v.tilt})`}>
