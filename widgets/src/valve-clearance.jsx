@@ -148,19 +148,6 @@ function stockConfig(stock) {
 // =============================================================================
 // Defaults — a Honda B16-flavoured VTEC four (so VTEC actually does something)
 // =============================================================================
-const DEFAULT_STOCK = {
-  stroke: 77.4, rod: 134.0, bore: 81.0, deckClear: 0.50, gasket: 0.70,
-  pocketInt: 2.00, pocketExh: 2.00,
-  intake:  { angle: 22, dia: 33, recess: 1.2, lift: 10.3, io: -5, ic: 45 },
-  exhaust: { angle: 22, dia: 28, recess: 1.4, lift: 9.4,  eo: 45, ec: -5 },
-  vtec: { intLift: 11.5, intDur: 252, exhLift: 10.5, exhDur: 248 },
-};
-const DEFAULT_MODS = {
-  deckMill: 0, gasket: 0.70,
-  intakeDia: 33, exhaustDia: 28, intakeAdvance: 0, exhaustRetard: 0,
-};
-
-// ---- Common-cam presets ----------------------------------------------------
 // Cam cards quote advertised duration + centerline; we derive our seat-to-seat
 // event convention (IO °ATDC, IC °ABDC, EO °BBDC, EC °BTDC) from those.
 const camEvents = (clIn, durIn, clEx, durEx) => ({
@@ -169,46 +156,72 @@ const camEvents = (clIn, durIn, clEx, durEx) => ({
   eo: clEx + durEx / 2 - 180,
   ec: clEx - durEx / 2,
 });
-// Representative engine geometries the cams bolt into (directional, not exact).
-// iPocket/ePocket are the factory piston valve-relief depths (per side). The 2JZ
-// runs famously deep reliefs — GE ~7mm intake / 9mm exhaust, GTE ~6.6 / 5.35 —
-// which is why it tolerates big cams without kissing a valve.
-const GEO = {
-  j1:  { stroke: 71.5, rod: 138.6, bore: 86.0, deck: 0.50, gasket: 1.20, iPocket: 2.0,  ePocket: 2.0,  angle: 21,   iDia: 34.0, eDia: 29.5, iRec: 1.3, eRec: 1.5 },
-  j2:  { stroke: 86.0, rod: 142.0, bore: 86.0, deck: 0.40, gasket: 1.30, iPocket: 6.6,  ePocket: 5.35, angle: 21.5, iDia: 33.5, eDia: 29.0, iRec: 1.3, eRec: 1.5 },
-  j2v: { stroke: 86.0, rod: 142.0, bore: 86.0, deck: 0.40, gasket: 1.20, iPocket: 7.0,  ePocket: 9.0,  angle: 21.5, iDia: 33.5, eDia: 29.0, iRec: 1.3, eRec: 1.5 },
-  k20: { stroke: 86.0, rod: 139.0, bore: 86.0, deck: 0.40, gasket: 0.70, iPocket: 1.8,  ePocket: 1.8,  angle: 23,   iDia: 35.0, eDia: 30.0, iRec: 1.0, eRec: 1.2 },
+
+// ---- Engines ---------------------------------------------------------------
+// Geometry + factory piston valve-relief depths (iPocket/ePocket, per side — the
+// 2JZ runs famously deep reliefs) + an OEM-ish stockCam. `fam` tags which cams
+// bolt up. `vtec` (when present) is the high lobe a VTEC engine switches to.
+const ENGINES = {
+  "Honda B16 — VTEC I4": { bore: 81, stroke: 77.4, rod: 134, deck: 0.5, gasket: 0.7, angle: 22, iDia: 33, eDia: 28, iRec: 1.2, eRec: 1.4, iPocket: 2.0, ePocket: 2.0, fam: "b",
+    vtec: { intLift: 11.5, intDur: 252, exhLift: 10.5, exhDur: 248 }, stockCam: { iLift: 10.3, iDur: 230, iCL: 110, eLift: 9.4, eDur: 230, eCL: 110 } },
+  "Honda K20A2 / Z3 — VTEC I4": { bore: 86, stroke: 86, rod: 139, deck: 0.4, gasket: 0.7, angle: 23, iDia: 35, eDia: 30, iRec: 1.0, eRec: 1.2, iPocket: 1.8, ePocket: 1.8, fam: "k",
+    vtec: { intLift: 11.5, intDur: 238, exhLift: 10.5, exhDur: 235 }, stockCam: { iLift: 10.7, iDur: 226, iCL: 112, eLift: 10.2, eDur: 222, eCL: 112 } },
+  "Toyota 1JZ-GTE": { bore: 86, stroke: 71.5, rod: 138.6, deck: 0.5, gasket: 1.2, angle: 21, iDia: 34, eDia: 29.5, iRec: 1.3, eRec: 1.5, iPocket: 2.0, ePocket: 2.0, fam: "1j-nonvvti",
+    stockCam: { iLift: 8.2, iDur: 224, iCL: 115, eLift: 8.2, eDur: 228, eCL: 115 } },
+  "Toyota 1JZ-GTE VVTi": { bore: 86, stroke: 71.5, rod: 138.6, deck: 0.5, gasket: 1.2, angle: 21, iDia: 34, eDia: 29.5, iRec: 1.3, eRec: 1.5, iPocket: 2.0, ePocket: 2.0, fam: "jz-vvti", vvti: true,
+    stockCam: { iLift: 8.7, iDur: 232, iCL: 110, eLift: 8.4, eDur: 236, eCL: 114 } },
+  "Toyota 2JZ-GTE": { bore: 86, stroke: 86, rod: 142, deck: 0.4, gasket: 1.3, angle: 21.5, iDia: 33.5, eDia: 29, iRec: 1.3, eRec: 1.5, iPocket: 6.6, ePocket: 5.35, fam: "2j-nonvvti",
+    stockCam: { iLift: 8.25, iDur: 224, iCL: 115, eLift: 8.25, eDur: 236, eCL: 115 } },
+  "Toyota 2JZ-GTE VVTi": { bore: 86, stroke: 86, rod: 142, deck: 0.4, gasket: 1.3, angle: 21.5, iDia: 33.5, eDia: 29, iRec: 1.3, eRec: 1.5, iPocket: 6.6, ePocket: 5.35, fam: "jz-vvti", vvti: true,
+    stockCam: { iLift: 8.7, iDur: 232, iCL: 110, eLift: 8.4, eDur: 236, eCL: 114 } },
+  "Toyota 2JZ-GE VVTi": { bore: 86, stroke: 86, rod: 142, deck: 0.4, gasket: 1.2, angle: 21.5, iDia: 33.5, eDia: 29, iRec: 1.3, eRec: 1.5, iPocket: 7.0, ePocket: 9.0, fam: "jz-vvti", vvti: true,
+    stockCam: { iLift: 8.4, iDur: 228, iCL: 112, eLift: 8.2, eDur: 232, eCL: 114 } },
+  "Chevy LS — pushrod V8": { bore: 101.6, stroke: 92, rod: 154, deck: 0.25, gasket: 1.0, angle: 15, iDia: 54, eDia: 41.5, iRec: 1.0, eRec: 1.2, iPocket: 1.5, ePocket: 1.5, fam: "ls",
+    stockCam: { iLift: 13.5, iDur: 196, iCL: 110, eLift: 13.0, eDur: 207, eCL: 116 } },
 };
-// Build a full stock config from a geometry + headline cam spec (lift/dur/CL).
-function mkCam(geo, c) {
-  const e = camEvents(c.iCL, c.iDur, c.eCL, c.eDur);
+
+// ---- Aftermarket cams ------------------------------------------------------
+// `fits` lists the engine families a cam bolts into. BC0311/BC0312/BC0331/BC0332
+// and the GSC VVTi cores fit any of the JZ VVTi engines (`jz-vvti`).
+const CAMS = {
+  "BC0331 — 1JZGTE Stage 2": { iLift: 8.74, iDur: 264, iCL: 110, eLift: 8.74, eDur: 264, eCL: 118, fits: ["1j-nonvvti", "jz-vvti"] },
+  "BC0332 — 1JZGTE Stage 3": { iLift: 9.52, iDur: 272, iCL: 110, eLift: 9.65, eDur: 272, eCL: 118, fits: ["1j-nonvvti", "jz-vvti"] },
+  "BC0311 — 2JZGE VVTi Stage 2": { iLift: 8.74, iDur: 264, iCL: 110, eLift: 8.74, eDur: 264, eCL: 118, fits: ["jz-vvti"] },
+  "BC0312 — 2JZGE VVTi Stage 3": { iLift: 9.52, iDur: 272, iCL: 110, eLift: 9.65, eDur: 272, eCL: 118, fits: ["jz-vvti"] },
+  "GSC 7031 S2 — 2JZ VVTi billet": { iLift: 10.20, iDur: 274, iCL: 109, eLift: 10.50, eDur: 274, eCL: 118, fits: ["jz-vvti"] },
+  "BC0302 — 2JZGTE Stage 3": { iLift: 9.52, iDur: 272, iCL: 110, eLift: 9.65, eDur: 272, eCL: 118, fits: ["2j-nonvvti"] },
+  "GSC 7030 S1 — 2JZGTE billet": { iLift: 9.90, iDur: 269, iCL: 108, eLift: 9.90, eDur: 269, eCL: 114, fits: ["2j-nonvvti"] },
+  "GSC S2 — 2JZGTE billet": { iLift: 10.20, iDur: 274, iCL: 109, eLift: 10.20, eDur: 274, eCL: 119, fits: ["2j-nonvvti"] },
+  "BC0042-2 — K20A2/Z3 Stage 2": { iLift: 13.34, iDur: 304, iCL: 101, eLift: 11.99, eDur: 300, eCL: 109, fits: ["k"] },
+};
+
+// Cam picklist for an engine: its OEM cam first, then every compatible aftermarket cam.
+function camsForEngine(engKey) {
+  const eng = ENGINES[engKey];
+  const opts = { "OEM / stock": eng.stockCam };
+  for (const [name, cam] of Object.entries(CAMS)) if (cam.fits.includes(eng.fam)) opts[name] = cam;
+  return opts;
+}
+
+// Compose a full stock config from an engine + a cam spec.
+function composeStock(eng, cam) {
+  const e = camEvents(cam.iCL, cam.iDur, cam.eCL, cam.eDur);
   return {
-    stroke: geo.stroke, rod: geo.rod, bore: geo.bore, deckClear: geo.deck, gasket: geo.gasket,
-    pocketInt: geo.iPocket, pocketExh: geo.ePocket,
-    intake:  { angle: geo.angle, dia: geo.iDia, recess: geo.iRec, lift: c.iLift, io: e.io, ic: e.ic },
-    exhaust: { angle: geo.angle, dia: geo.eDia, recess: geo.eRec, lift: c.eLift, eo: e.eo, ec: e.ec },
-    vtec: { intLift: c.iLift, intDur: c.iDur, exhLift: c.eLift, exhDur: c.eDur }, // no 2nd lobe
+    bore: eng.bore, stroke: eng.stroke, rod: eng.rod, deckClear: eng.deck, gasket: eng.gasket,
+    pocketInt: eng.iPocket, pocketExh: eng.ePocket,
+    intake:  { angle: eng.angle, dia: eng.iDia, recess: eng.iRec, lift: cam.iLift, io: e.io, ic: e.ic },
+    exhaust: { angle: eng.angle, dia: eng.eDia, recess: eng.eRec, lift: cam.eLift, eo: e.eo, ec: e.ec },
+    vtec: eng.vtec || { intLift: cam.iLift, intDur: cam.iDur, exhLift: cam.eLift, exhDur: cam.eDur },
   };
 }
 
-const PRESET_GROUPS = [
-  { group: "Engine baseline", items: {
-    "Honda B16 — VTEC I4": DEFAULT_STOCK,
-    "Toyota 2JZ-GTE — stockish": mkCam(GEO.j2, { iLift: 8.7, iDur: 224, iCL: 112, eLift: 8.3, eDur: 228, eCL: 116 }),
-    "Chevy LS — stockish": mkCam({ stroke: 92, rod: 154, bore: 101.6, deck: 0.25, gasket: 1.0, iPocket: 1.5, ePocket: 1.5, angle: 15, iDia: 54, eDia: 41.5, iRec: 1.0, eRec: 1.2 },
-      { iLift: 13.5, iDur: 196, iCL: 110, eLift: 13.0, eDur: 207, eCL: 116 }),
-  }},
-  { group: "Brian Crower", items: {
-    "1JZ-GTE Stage 3 — BC0332": mkCam(GEO.j1,  { iLift: 9.52, iDur: 272, iCL: 110, eLift: 9.65, eDur: 272, eCL: 118 }),
-    "2JZGE VVTi Stage 2 — BC0311": mkCam(GEO.j2v, { iLift: 8.74, iDur: 264, iCL: 110, eLift: 8.74, eDur: 264, eCL: 118 }),
-    "K20A2/Z3 Stage 2 — BC0042-2": mkCam(GEO.k20, { iLift: 13.34, iDur: 304, iCL: 101, eLift: 11.99, eDur: 300, eCL: 109 }),
-  }},
-  { group: "GSC Power-Division — 2JZ-GTE", items: {
-    "GSC S1 — billet": mkCam(GEO.j2, { iLift: 9.90, iDur: 269, iCL: 108, eLift: 9.90, eDur: 269, eCL: 114 }),
-    "GSC S2 — billet": mkCam(GEO.j2, { iLift: 10.20, iDur: 274, iCL: 109, eLift: 10.20, eDur: 274, eCL: 119 }),
-  }},
-];
-const PRESETS = Object.assign({}, ...PRESET_GROUPS.map((g) => g.items));
+const DEFAULT_ENGINE = "Honda B16 — VTEC I4";
+const DEFAULT_CAM = "OEM / stock";
+const DEFAULT_STOCK = composeStock(ENGINES[DEFAULT_ENGINE], ENGINES[DEFAULT_ENGINE].stockCam);
+const DEFAULT_MODS = {
+  deckMill: 0, gasket: DEFAULT_STOCK.gasket,
+  intakeDia: DEFAULT_STOCK.intake.dia, exhaustDia: DEFAULT_STOCK.exhaust.dia, intakeAdvance: 0, exhaustRetard: 0,
+};
 
 // Safe-minimum guidance (mm). Exhaust runs hotter and stretches, so it wants more.
 const THRESH = { cautionInt: 1.3, dangerInt: 0.9, cautionExh: 1.5, dangerExh: 1.0 };
@@ -566,15 +579,25 @@ function App() {
   });
   const setM = (k, v) => setMods((m) => ({ ...m, [k]: v }));
 
-  const [preset, setPreset] = useState("Honda B16 — VTEC I4");
-  const applyPreset = (name) => {
-    const p = PRESETS[name];
-    if (!p) return;
-    setPreset(name);
+  const [engineKey, setEngineKey] = useState(DEFAULT_ENGINE);
+  const [camKey, setCamKey] = useState(DEFAULT_CAM);
+  const camOptions = camsForEngine(engineKey);
+
+  const applyStock = (p) => {
     setStock(p);
     setMods({ deckMill: 0, gasket: p.gasket,
       intakeDia: p.intake.dia, exhaustDia: p.exhaust.dia, intakeAdvance: 0, exhaustRetard: 0 });
-    setVtecOn(p === DEFAULT_STOCK); // only the B16 baseline carries a real VTEC lobe
+  };
+  const applyEngine = (key) => {
+    const eng = ENGINES[key];
+    setEngineKey(key); setCamKey(DEFAULT_CAM);              // reset to the OEM cam
+    applyStock(composeStock(eng, eng.stockCam));
+    setVtecOn(!!eng.vtec);
+  };
+  const applyCam = (key) => {
+    const eng = ENGINES[engineKey];
+    setCamKey(key);
+    applyStock(composeStock(eng, camsForEngine(engineKey)[key]));
   };
 
   const ResultCard = ({ title, color, cur, stk, caution, danger }) => {
@@ -622,18 +645,24 @@ function App() {
           {/* ---- LEFT: inputs ---- */}
           <div>
             <Section title="Stock baseline" sub="The factory engine — your yardstick.">
-              <label style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 12, fontSize: 12, color: C.inkSoft }}>
-                <span>Engine / common-cam preset</span>
-                <select value={preset} onChange={(e) => applyPreset(e.target.value)}
-                  style={{ background: C.bg, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 7,
-                    padding: "7px 9px", fontSize: 13, fontFamily: "inherit", cursor: "pointer" }}>
-                  {PRESET_GROUPS.map((g) => (
-                    <optgroup key={g.group} label={g.group}>
-                      {Object.keys(g.items).map((n) => <option key={n} value={n}>{n}</option>)}
-                    </optgroup>
-                  ))}
-                </select>
-              </label>
+              <div style={{ ...grid(1), marginBottom: 12 }}>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: C.inkSoft }}>
+                  <span>Engine</span>
+                  <select value={engineKey} onChange={(e) => applyEngine(e.target.value)}
+                    style={{ background: C.bg, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 7,
+                      padding: "7px 9px", fontSize: 13, fontFamily: "inherit", cursor: "pointer" }}>
+                    {Object.keys(ENGINES).map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: C.inkSoft }}>
+                  <span>Camshaft <span style={{ opacity: 0.7 }}>· cams that fit this engine</span></span>
+                  <select value={camKey} onChange={(e) => applyCam(e.target.value)}
+                    style={{ background: C.bg, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 7,
+                      padding: "7px 9px", fontSize: 13, fontFamily: "inherit", cursor: "pointer" }}>
+                    {Object.keys(camOptions).map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </label>
+              </div>
               <div style={grid(2)}>
                 <NumField label="Bore" value={stock.bore} onChange={(v) => setS("bore", v)} unit="mm" />
                 <NumField label="Stroke" value={stock.stroke} onChange={(v) => setS("stroke", v)} unit="mm" />
@@ -681,12 +710,12 @@ function App() {
               </div>
             </Section>
 
-            <Section title="Cam timing — VVT" sub="Intake advance and exhaust retard both widen overlap and tighten P2V.">
-              <Slider label="Intake cam advance" value={mods.intakeAdvance} min={-20} max={20} step={1}
+            <Section title="Cam timing — VVT" sub="Intake advance and exhaust retard both widen overlap and tighten P2V. Up to 30° of cam authority.">
+              <Slider label="Intake cam advance" value={mods.intakeAdvance} min={-20} max={30} step={1}
                 onChange={(v) => setM("intakeAdvance", v)} unit="°" color={C.intake}
                 readout={`${mods.intakeAdvance >= 0 ? "+" : ""}${mods.intakeAdvance}° adv`} />
               <div style={{ height: 10 }} />
-              <Slider label="Exhaust cam retard" value={mods.exhaustRetard} min={-20} max={20} step={1}
+              <Slider label="Exhaust cam retard" value={mods.exhaustRetard} min={-20} max={30} step={1}
                 onChange={(v) => setM("exhaustRetard", v)} unit="°" color={C.exhaust}
                 readout={`${mods.exhaustRetard >= 0 ? "+" : ""}${mods.exhaustRetard}° ret`} />
             </Section>
