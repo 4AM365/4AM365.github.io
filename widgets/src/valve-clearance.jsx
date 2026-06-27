@@ -169,18 +169,21 @@ const camEvents = (clIn, durIn, clEx, durEx) => ({
   ec: clEx - durEx / 2,
 });
 // Representative engine geometries the cams bolt into (directional, not exact).
+// iPocket/ePocket are the factory piston valve-relief depths (per side). The 2JZ
+// runs famously deep reliefs — GE ~7mm intake / 9mm exhaust, GTE ~6.6 / 5.35 —
+// which is why it tolerates big cams without kissing a valve.
 const GEO = {
-  j1:  { stroke: 71.5, rod: 138.6, deck: 0.50, gasket: 1.20, pocket: 2.0, angle: 21,   iDia: 34.0, eDia: 29.5, iRec: 1.3, eRec: 1.5 },
-  j2:  { stroke: 86.0, rod: 142.0, deck: 0.40, gasket: 1.30, pocket: 2.2, angle: 21.5, iDia: 33.5, eDia: 29.0, iRec: 1.3, eRec: 1.5 },
-  j2v: { stroke: 86.0, rod: 142.0, deck: 0.40, gasket: 1.20, pocket: 2.0, angle: 21.5, iDia: 33.5, eDia: 29.0, iRec: 1.3, eRec: 1.5 },
-  k20: { stroke: 86.0, rod: 139.0, deck: 0.40, gasket: 0.70, pocket: 1.8, angle: 23,   iDia: 35.0, eDia: 30.0, iRec: 1.0, eRec: 1.2 },
+  j1:  { stroke: 71.5, rod: 138.6, deck: 0.50, gasket: 1.20, iPocket: 2.0,  ePocket: 2.0,  angle: 21,   iDia: 34.0, eDia: 29.5, iRec: 1.3, eRec: 1.5 },
+  j2:  { stroke: 86.0, rod: 142.0, deck: 0.40, gasket: 1.30, iPocket: 6.6,  ePocket: 5.35, angle: 21.5, iDia: 33.5, eDia: 29.0, iRec: 1.3, eRec: 1.5 },
+  j2v: { stroke: 86.0, rod: 142.0, deck: 0.40, gasket: 1.20, iPocket: 7.0,  ePocket: 9.0,  angle: 21.5, iDia: 33.5, eDia: 29.0, iRec: 1.3, eRec: 1.5 },
+  k20: { stroke: 86.0, rod: 139.0, deck: 0.40, gasket: 0.70, iPocket: 1.8,  ePocket: 1.8,  angle: 23,   iDia: 35.0, eDia: 30.0, iRec: 1.0, eRec: 1.2 },
 };
 // Build a full stock config from a geometry + headline cam spec (lift/dur/CL).
 function mkCam(geo, c) {
   const e = camEvents(c.iCL, c.iDur, c.eCL, c.eDur);
   return {
     stroke: geo.stroke, rod: geo.rod, deckClear: geo.deck, gasket: geo.gasket,
-    pocketInt: geo.pocket, pocketExh: geo.pocket,
+    pocketInt: geo.iPocket, pocketExh: geo.ePocket,
     intake:  { angle: geo.angle, dia: geo.iDia, recess: geo.iRec, lift: c.iLift, io: e.io, ic: e.ic },
     exhaust: { angle: geo.angle, dia: geo.eDia, recess: geo.eRec, lift: c.eLift, eo: e.eo, ec: e.ec },
     vtec: { intLift: c.iLift, intDur: c.iDur, exhLift: c.eLift, exhDur: c.eDur }, // no 2nd lobe
@@ -191,7 +194,7 @@ const PRESET_GROUPS = [
   { group: "Engine baseline", items: {
     "Honda B16 — VTEC I4": DEFAULT_STOCK,
     "Toyota 2JZ-GTE — stockish": mkCam(GEO.j2, { iLift: 8.7, iDur: 224, iCL: 112, eLift: 8.3, eDur: 228, eCL: 116 }),
-    "Chevy LS — stockish": mkCam({ stroke: 92, rod: 154, deck: 0.25, gasket: 1.0, pocket: 1.5, angle: 15, iDia: 54, eDia: 41.5, iRec: 1.0, eRec: 1.2 },
+    "Chevy LS — stockish": mkCam({ stroke: 92, rod: 154, deck: 0.25, gasket: 1.0, iPocket: 1.5, ePocket: 1.5, angle: 15, iDia: 54, eDia: 41.5, iRec: 1.0, eRec: 1.2 },
       { iLift: 13.5, iDur: 196, iCL: 110, eLift: 13.0, eDur: 207, eCL: 116 }),
   }},
   { group: "Brian Crower", items: {
