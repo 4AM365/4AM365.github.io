@@ -184,14 +184,22 @@ const ENGINES = {
 // `fits` lists the engine families a cam bolts into. BC0311/BC0312/BC0331/BC0332
 // and the GSC VVTi cores fit any of the JZ VVTi engines (`jz-vvti`).
 const CAMS = {
-  "BC0331 — 1JZGTE Stage 2": { iLift: 8.74, iDur: 264, iCL: 110, eLift: 8.74, eDur: 264, eCL: 118, fits: ["1j-nonvvti", "jz-vvti"] },
+  // 1JZGTE (the Stage 3 race grind also fits the JZ VVT-i engines)
+  "BC0331 — 1JZGTE Stage 2": { iLift: 8.74, iDur: 264, iCL: 110, eLift: 8.74, eDur: 264, eCL: 118, fits: ["1j-nonvvti"] },
   "BC0332 — 1JZGTE Stage 3": { iLift: 9.52, iDur: 272, iCL: 110, eLift: 9.65, eDur: 272, eCL: 118, fits: ["1j-nonvvti", "jz-vvti"] },
+  "BC0334 — 1JZGTE VVTi Stage 2": { iLift: 8.74, iDur: 264, iCL: 110, eLift: 8.74, eDur: 264, eCL: 118, fits: ["jz-vvti"] },
+  // 2JZGE VVT-i
   "BC0311 — 2JZGE VVTi Stage 2": { iLift: 8.74, iDur: 264, iCL: 110, eLift: 8.74, eDur: 264, eCL: 118, fits: ["jz-vvti"] },
   "BC0312 — 2JZGE VVTi Stage 3": { iLift: 9.52, iDur: 272, iCL: 110, eLift: 9.65, eDur: 272, eCL: 118, fits: ["jz-vvti"] },
+  "BC0313 — 2JZGE VVTi Stage 3+ Race": { iLift: 10.29, iDur: 276, iCL: 110, eLift: 10.29, eDur: 276, eCL: 118, fits: ["jz-vvti"] },
   "GSC 7031 S2 — 2JZ VVTi billet": { iLift: 10.20, iDur: 274, iCL: 109, eLift: 10.50, eDur: 274, eCL: 118, fits: ["jz-vvti"] },
+  // 2JZGTE (non-VVT-i)
+  "BC0301 — 2JZGTE Stage 2": { iLift: 9.52, iDur: 264, iCL: 110, eLift: 9.52, eDur: 264, eCL: 118, fits: ["2j-nonvvti"] },
   "BC0302 — 2JZGTE Stage 3": { iLift: 9.52, iDur: 272, iCL: 110, eLift: 9.65, eDur: 272, eCL: 118, fits: ["2j-nonvvti"] },
+  "BC0304 — 2JZGTE Stage 3+ Race": { iLift: 10.29, iDur: 276, iCL: 110, eLift: 10.29, eDur: 276, eCL: 118, fits: ["2j-nonvvti"] },
   "GSC 7030 S1 — 2JZGTE billet": { iLift: 9.90, iDur: 269, iCL: 108, eLift: 9.90, eDur: 269, eCL: 114, fits: ["2j-nonvvti"] },
   "GSC S2 — 2JZGTE billet": { iLift: 10.20, iDur: 274, iCL: 109, eLift: 10.20, eDur: 274, eCL: 119, fits: ["2j-nonvvti"] },
+  // Honda K
   "BC0042-2 — K20A2/Z3 Stage 2": { iLift: 13.34, iDur: 304, iCL: 101, eLift: 11.99, eDur: 300, eCL: 109, fits: ["k"] },
 };
 
