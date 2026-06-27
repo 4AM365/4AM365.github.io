@@ -395,21 +395,29 @@ function CrossSection({ cfg, theta }) {
 
   // canted, to-scale relief: a valve-diameter-wide, pocket-deep slot cut into the
   // crown along the valve axis (rotate by the same tilt as the valve).
-  // A valve relief is a fly-cut at the valve angle — in section a right triangle:
-  // the hypotenuse lies along the (flat) piston crown, the base (floor) is
-  // perpendicular to the valve stem (parallel to the valve face), and the adjacent
-  // leg is parallel to the stem, meeting the base at the right angle. Vertical
-  // depth (the altitude to the crown) is the relief depth; the opening width and
-  // cant follow from the valve angle.
+  // A valve relief is a fly-cut at the valve angle — in section a right triangle.
+  // The two legs are the physical dimensions: the base (floor) is the valve width
+  // and is perpendicular to the valve stem (parallel to the valve face); the
+  // adjacent leg is the relief depth and is parallel to the stem, meeting the
+  // base at the right angle. The hypotenuse closes the opening near the crown
+  // (it can't stay exactly horizontal once both legs are pinned, so we seat the
+  // triangle's highest corner on the crown and let the opening tilt).
   const Relief = ({ v }) => {
-    const P = v.pocket * pp;                         // vertical depth (altitude)
-    const s = v.tilt < 0 ? -1 : 1;                   // which way the valve leans
-    const a = rad(Math.max(1, Math.abs(v.tilt)));
-    const tan = Math.tan(a), cot = 1 / tan;
-    const cX = X(v.xc) - s * P * (tan - cot) / 2;     // deep right-angle corner x
-    const Ax = cX - s * P * cot;                      // floor lip (base ⊥ stem)
-    const Bx = cX + s * P * tan;                      // wall lip (adjacent ∥ stem)
-    const pts = `${Ax.toFixed(1)},${pistonY.toFixed(1)} ${Bx.toFixed(1)},${pistonY.toFixed(1)} ${cX.toFixed(1)},${(pistonY + P).toFixed(1)}`;
+    const base = v.dia * pp;                 // floor length = valve width (⊥ stem)
+    const adj = v.pocket * pp;               // depth along the stem  (∥ stem)
+    const t = rad(v.tilt);
+    const sd = [-Math.sin(t), Math.cos(t)];  // stem-down unit
+    const uAdj = [-sd[0], -sd[1]];           // up the stem
+    let uBase = [sd[1], -sd[0]];             // ⊥ stem; force the upward choice
+    if (uBase[1] > 0) uBase = [-uBase[0], -uBase[1]];
+    const C0 = [0, 0];                                   // deep right-angle corner
+    const A = [base * uBase[0], base * uBase[1]];        // floor lip
+    const B = [adj * uAdj[0], adj * uAdj[1]];            // wall lip
+    const verts = [C0, A, B];
+    const topY = Math.min(...verts.map((p) => p[1]));    // seat highest corner on crown
+    const cenX = (C0[0] + A[0] + B[0]) / 3;
+    const dx = X(v.xc) - cenX, dy = pistonY - topY;
+    const pts = verts.map((p) => `${(p[0] + dx).toFixed(1)},${(p[1] + dy).toFixed(1)}`).join(" ");
     return <polygon points={pts} fill={C.bg} stroke={C.piston} strokeWidth="1.5" opacity="0.9" />;
   };
   const Valve = ({ v, color, label }) => (
