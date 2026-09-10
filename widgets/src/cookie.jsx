@@ -976,6 +976,8 @@ export default function CookieBuildSheet() {
   const [importText, setImportText] = useState("");
   const [ioOpen, setIoOpen] = useState(false);
   const [ioMsg, setIoMsg] = useState("");
+  // Consolidated shopping-list block (every ingredient, one place) + its own copy.
+  const [ingMsg, setIngMsg] = useState("");
 
   // Inherit the page's vibe + brightness → palette (standalone defaults to jdm).
   const geocities = vibe === "geocities"; // drives the retro banner + GEO_CSS skin
@@ -1221,6 +1223,54 @@ export default function CookieBuildSheet() {
     L.push(`@${IO_TAG} v1@ ${JSON.stringify(ioState)}`);
     return L.join("\n");
   }, [recipeName, special, boundStyle, f, specialRecipe, cookieCount, sc, groups, STEPS, profile, notes, envOn, envData, elevFtUsed, humidityUsed, roomTempInput, tempUnit, q, scoop, addinSel, addinLoadPct, cocoaMode, cocoaPct, zip, envDate, humidityManual, envApplied]);
+
+  // ---- All-ingredients block ------------------------------------------------
+  // The timeline lists each ingredient at the moment it goes in, which is right
+  // for baking but useless for shopping. This flattens `groups` into one ordered
+  // list — every ingredient, its weight, its baker's percentage — so you can
+  // scan the whole buy-list at once and copy it out as plaintext.
+  const ingredientLines = useMemo(
+    () => groups.map((g) => ({
+      title: g.title,
+      caption: g.caption || "",
+      brine: !!g.brine,
+      items: g.items.filter((it) => it.g == null || it.g > 0),
+    })).filter((g) => g.items.length > 0),
+    [groups]);
+
+  const ingredientCount = useMemo(
+    () => ingredientLines.reduce((n, g) => n + g.items.length, 0), [ingredientLines]);
+
+  const ingredientsText = useMemo(() => {
+    const L = [];
+    L.push(`CookieBot — ${recipeName} — ingredients`);
+    L.push(`${f} g flour base${specialRecipe ? "" : ` · makes ~${cookieCount} ${sc.label.toLowerCase()} cookies`}`);
+    L.push("-".repeat(52));
+    ingredientLines.forEach((g) => {
+      L.push("");
+      L.push(`${g.title.toUpperCase()}${g.caption ? ` (${g.caption})` : ""}`);
+      g.items.forEach((it) => {
+        const name = String(it.k).replace(/\s+/g, " ").trim();
+        const amt = it.g != null
+          ? `${it.g} g${it.pct != null ? ` (${it.pct}%)` : ""}`
+          : "to taste";
+        const pad = Math.max(1, 38 - name.length);
+        L.push(`  ${name} ${".".repeat(pad)} ${amt}`);
+      });
+    });
+    if (!specialRecipe) {
+      L.push("");
+      L.push(`TOTAL DOUGH ${round(v.doughWeight)} g · oven ${ovenF}°F · ${sc.min}-${sc.max} min`);
+    }
+    L.push("");
+    L.push("Percentages are baker's percentages, relative to total flour = 100%.");
+    return L.join("\n");
+  }, [ingredientLines, recipeName, f, specialRecipe, cookieCount, sc, v.doughWeight, ovenF]);
+
+  function copyIngredients() {
+    try { navigator.clipboard.writeText(ingredientsText); setIngMsg("✓ Ingredients copied."); }
+    catch { setIngMsg("Couldn't reach the clipboard — select the list and copy it manually."); }
+  }
 
   function loadRecipe() {
     const d = parseRecipeBlock(importText);
@@ -1708,10 +1758,22 @@ export default function CookieBuildSheet() {
           </div>
         </div>
 
-        {/* Ingredient table — fixed recipes only; dial recipes list ingredients on the timeline */}
-        {specialRecipe && (
+        {/* All ingredients — every component in one place, whatever the recipe mode.
+            The timeline still shows *when* each goes in; this is the shopping /
+            mise-en-place view, and it copies out as plaintext. */}
+        {ingredientLines.length > 0 && (
           <div style={{ borderRadius: 14, border: `1.5px solid ${C.line}`, overflow: "hidden", marginBottom: 14, background: C.card }}>
-            {groups.map((grp, gi) => (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "12px 18px", borderBottom: `1.5px solid ${C.line}` }}>
+              <span>
+                <span style={{ fontFamily: mono, fontSize: 11.5, letterSpacing: 1.5, textTransform: "uppercase", color: C.choc, fontWeight: 600 }}>All ingredients</span>
+                <span style={{ display: "block", fontSize: 12, color: C.inkSoft, fontStyle: "italic", marginTop: 2 }}>
+                  {ingredientCount} items{specialRecipe ? "" : ` · ${round(v.doughWeight)} g dough · ≈${cookieCount} cookies`}
+                </span>
+              </span>
+              <button onClick={copyIngredients} style={{ border: "none", borderRadius: 9, padding: "8px 15px", cursor: "pointer", fontFamily: mono, fontSize: 12, fontWeight: 600, background: C.butter, color: C.onAccent }}>Copy list</button>
+            </div>
+            {ingMsg && <div style={{ padding: "7px 18px", fontFamily: mono, fontSize: 11.5, color: C.inkSoft, background: C.paperDeep }}>{ingMsg}</div>}
+            {ingredientLines.map((grp, gi) => (
               <div key={grp.title}>
                 <div style={{ padding: "11px 18px 9px", background: grp.brine ? C.mixBg : C.paperDeep, borderTop: gi === 0 ? "none" : `1.5px solid ${C.line}` }}>
                   <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11.5, letterSpacing: 1.5, textTransform: "uppercase", color: grp.brine ? C.choc : C.inkSoft, fontWeight: 600 }}>

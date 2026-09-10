@@ -21,11 +21,11 @@ npm run publish:blog -- "your change"   # commits+pushes foccaciabot, then rebui
                                         # the widget + syncs the doc here, commits, pushes
 ```
 
-**cookie** — still a **verbatim copy** of the playground build sheet, model
+**cookie** — still a **verbatim copy** of the `home-projects/cookiebot` build sheet, model
 mirrored under `widgets/src/src/cookie-model.js`. To update:
 ```
-cp playground/cookiebot/cookie-build-sheet.jsx  ventures/4AM365.github.io/widgets/src/cookie.jsx
-cp playground/cookiebot/src/cookie-model.js      ventures/4AM365.github.io/widgets/src/src/cookie-model.js
+cp home-projects/cookiebot/cookie-build-sheet.jsx  ventures/4AM365.github.io/widgets/src/cookie.jsx
+cp home-projects/cookiebot/src/cookie-model.js      ventures/4AM365.github.io/widgets/src/src/cookie-model.js
 cd ventures/4AM365.github.io && npm run build:widgets && git commit -am ... && git push
 ```
 (Migrating cookie to the same git-dependency pattern as focaccia is a good follow-up.)
