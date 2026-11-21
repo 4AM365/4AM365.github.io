@@ -48,8 +48,9 @@ const FZ = {
 // (the forum figure) at ID 13.0 mm.
 // Oil pressure: 5.8 bar hot at 3000-3500 rpm [build notes, notes/oil_pressure.md] = 84 psi.
 // Boost 135 kPa gauge = MAP 236 kPa abs (101.3 + 135, as the SUPRA note's PR 2.34). Spark 20 deg: the 2026-09-19 tune's
-// E0 table reads 6.5 deg and its E100 table 21.5 deg at 5632 rpm / 240 kPa; the flex blend (table 1 weight 14 % at 60 % ethanol)
-// gives about 19.7 deg [build notes, derived], so 20.
+// E0 table reads 6.5 deg and its E100 table 21.5 deg at 5632 rpm / 240 kPa. The flex blend's 14 % table 1 is at 62.5 % ethanol
+// (19.4 deg); at 60 % the tune's tblsFFIgnBlend gives 18.2 % table 1, i.e. 18.8 deg [tune, derived; corrected 2026-11-21, this
+// line said 14 % at 60 %]. Default kept at 20; supra-maps-stress.md uses the interpolated table value instead.
 // backRatio 0.9: measured EMAP/MAP, 0.87-0.91 at MAP > 165 kPa and 5-6k rpm [build notes, emap_map_ratio_cam_overlap.md s.2].
 const JZ = {
   label: "2JZ-GE block / VVT-i head", car: "MKIV Supra",
