@@ -53,13 +53,13 @@ cd ventures/4AM365.github.io && npm run build:widgets && git commit -am ... && g
 Embedded at `content/cars/combustion-cov.md`.
 
 **crank-bearing-calc** — a **verbatim copy**. Canonical source is the standalone
-`Hobbies/Cars/Land Cruiser/bearing-stress-calc` repo (`bearing-stress.jsx` + `model/*.js`,
+`Hobbies/Cars/Projects/engine-stress-analyzer` repo (`bearing-stress.jsx` + `model/*.js`,
 checks in `model/check-*.mjs`). The jsx is copied with its import repointed to
 `./src/crank-bearing-calc/calc.js`; the model files go to `widgets/src/src/crank-bearing-calc/`.
 `build-one.mjs` in the source repo builds only this bundle with the same esbuild settings.
 To update:
 ```
-cd "Hobbies/Cars/Land Cruiser/bearing-stress-calc/model" && for f in check-*.mjs; do node $f; done
+cd "Hobbies/Cars/Projects/engine-stress-analyzer/model" && for f in check-*.mjs; do node $f; done
 cp model/{calc,combustion,bearing,rodpin,cams,engines}.js  <blog>/widgets/src/src/crank-bearing-calc/
 sed 's#"./model/calc.js"#"./src/crank-bearing-calc/calc.js"#' bearing-stress.jsx > <blog>/widgets/src/crank-bearing-calc.jsx
 cd <blog> && node "<source>/build-one.mjs" crank-bearing-calc && git commit ... && git push

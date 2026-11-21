@@ -1,4 +1,4 @@
-// Copied from Hobbies/Cars/Land Cruiser/bearing-stress-calc (canonical); model files copied to ./src/crank-bearing-calc/.
+// Copied from Hobbies/Cars/Projects/engine-stress-analyzer (canonical); model files copied to ./src/crank-bearing-calc/.
 // Crank bearing stress calculator - UI. Imports ONLY analyze/torqueSweep/DEFAULTS/OPTIONS from the model glue.
 // Runs standalone (index.html) and as a blog widget (default export, Preact-compatible hooks only).
 import React, { useState, useMemo, useEffect, useRef } from "react";
