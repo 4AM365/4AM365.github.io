@@ -39,7 +39,7 @@ function geomOf(u) {
 function camState(u) {
   const cam = CAMS[u.cam] || CAMS.Stock, ev = camEvents(cam, u.inAdv, u.exAdv);
   const ve = u.veMode === "manual" ? u.ve : camVE(cam, u.inAdv, u.exAdv, u.rpm);
-  const residual = residualEstimate(ev, u.backRatio, u.rpm);
+  const residual = residualEstimate(ev, u.backRatio, u.rpm, u.cr);
   return { cam, ev, ve, residual, dilution: u.dilMode === "cam" ? residual : u.dilution / 100 };
 }
 function opOf(u, mapKPa, spark) {

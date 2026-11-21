@@ -12,17 +12,19 @@ const CP_AIR = 1005;        // J/kg/K, for charge-cooling estimate
 const T_WALL = 450;         // K
 
 // ---- fuels ------------------------------------------------------------------------------------------------
-// slCoef: Metghalchi-Keck form S_L0 = Bm + Bphi (phi - phim)^2 [m/s at 298 K, 1 atm];
-//   alpha = alpha0 + alphaPhi (phi-1), beta = beta0 + betaPhi (phi-1)   (alpha,beta stored as the phi=1 values).
-// Gasoline = isooctane values (Metghalchi & Keck 1982; Heywood, Internal Combustion Engine Fundamentals ch. 9).
-// Methanol: Metghalchi & Keck 1982 (Bm 0.369, Bphi -1.405, phim 1.11; alpha, beta as isooctane).
-// Ethanol: Guelder, SAE 841000 (1984) "Correlations of laminar combustion data for alternative S.I. engine fuels",
-//   peak ~0.46 m/s at phi~1.1. Values entered from memory of that paper, NOT re-verified against the source:
-//   Bphi from its exp(-4.48 (phi-1.075)^2) curvature, alpha 1.75 and beta -0.17 likewise. Check before trusting E85/E100 S_L.
+// slCoef: Metghalchi-Keck form S_L0 = Bm + Bphi (phi - phim)^2 [m/s at 298 K, 1 atm] (Heywood Eq. 9.38, Table 9.2, p. 705; Heywood prints
+//   the quadratic as Bm - Bphi(...)^2 with Bphi < 0, a sign slip: the curve must peak at phim, so the code adds the negative Bphi);
+//   alpha = alpha0 + alphaPhi (phi-1), beta = beta0 + betaPhi (phi-1)  (Eq. 9.37a,b, pp. 704-705: alpha 2.18 - 0.8(phi-1), beta -0.16 + 0.22(phi-1),
+//   stated to hold for propane, isooctane, ethanol and methanol alike).
+// gas: weight of the gasoline T/p-exponent fit alpha_g = 2.4 - 0.271 phi^3.51, beta_g = -0.357 + 0.14 phi^2.77 (Heywood Eq. 9.39, p. 705,
+//   reference gasoline MW 107, H/C 1.69; Rhodes & Keck). 1 for gasoline, 0 for the alcohols, mass-weighted in blends.
+// Table 9.2 (p. 705), cm/s -> m/s: gasoline phim 1.21, Bm 30.5, Bphi -55; isooctane 1.13, 26.3, -85; ethanol 1.10, 40.0, -200;
+//   methanol 1.11, 36.9, -140 (Bphi -1.405 here is the Metghalchi-Keck 1982 value, -140 rounded in Heywood).
+// 91/93 use the gasoline row (changed from isooctane, 2026-11-21: Heywood gives gasoline its own fit, ~15 % faster than isooctane at phi 1.2).
 // octane = RON (as in project.py "on"); not used by the combustion model. hvap in J/kg.
-const GAS_SL = { Bm: 0.263, Bphi: -0.847, phim: 1.13, alpha: 2.18, beta: -0.16, alphaPhi: -0.8, betaPhi: 0.22 };
-const ETOH_SL = { Bm: 0.46, Bphi: -2.0, phim: 1.10, alpha: 1.75, beta: -0.17, alphaPhi: -0.8, betaPhi: 0.22 };
-const MEOH_SL = { Bm: 0.369, Bphi: -1.405, phim: 1.11, alpha: 2.18, beta: -0.16, alphaPhi: -0.8, betaPhi: 0.22 };
+const GAS_SL = { Bm: 0.305, Bphi: -0.55, phim: 1.21, alpha: 2.18, beta: -0.16, alphaPhi: -0.8, betaPhi: 0.22, gas: 1 };
+const ETOH_SL = { Bm: 0.40, Bphi: -2.0, phim: 1.10, alpha: 2.18, beta: -0.16, alphaPhi: -0.8, betaPhi: 0.22, gas: 0 };   // Heywood Table 9.2 ethanol row, p. 705
+const MEOH_SL = { Bm: 0.369, Bphi: -1.405, phim: 1.11, alpha: 2.18, beta: -0.16, alphaPhi: -0.8, betaPhi: 0.22, gas: 0 };
 
 const GAS = { lhv: 43.0e6, afrSt: 14.7, hvap: 350e3 };
 const ETOH = { lhv: 26.8e6, afrSt: 8.95, hvap: 920e3 };
@@ -43,9 +45,9 @@ export const FUELS = {
 
 // ---- calibration constants (see calibration block at the bottom of the check script) --------------------------
 // Reference case: 91, lambda 0.85, 3000 rpm, MAP 100 kPa, 5 % dilution, tCharge 318 K, tumble 1, q 1, 1FZ, spark 25 BTDC.
-const KD = 4.011;    // ignition-delay constant: t_d = KD nu^(1/3) L^(2/3) / (S_L S_T)^(2/3), L = TDC clearance height;
+const KD = 4.102;    // ignition-delay constant: t_d = KD nu^(1/3) L^(2/3) / (S_L S_T)^(2/3), L = TDC clearance height;
 //   S_T enters (as a geometric mean with S_L) so turbulence shortens the kernel stage and delay in degrees does not run away with rpm
-const KB = 0.4011;   // rapid-burn constant:     t_b = KB (bore/2) / S_T,  S_T = Zimont (see cylinderPressure)
+const KB = 0.4056;   // rapid-burn constant:     t_b = KB (bore/2) / S_T,  S_T = Zimont (see cylinderPressure)
 export const CAL = { get KD() { return KD; }, get KB() { return KB; } };
 
 // ---- geometry -----------------------------------------------------------------------------------------------
@@ -73,7 +75,9 @@ export function geometry(g) {
 // Metghalchi-Keck: S_L = S_L0(phi) (Tu/298)^alpha (p/101325)^beta (1 - 2.06 x^0.77)
 function laminarSpeed(c, phi, Tu, p, xDil) {
   const sl0 = c.Bm + c.Bphi * (phi - c.phim) ** 2;
-  const a = c.alpha + c.alphaPhi * (phi - 1), b = c.beta + c.betaPhi * (phi - 1);
+  const g = c.gas || 0;   // gasoline-form exponents (Eq. 9.39) weight; the rest use Eq. 9.37
+  const a = (1 - g) * (c.alpha + c.alphaPhi * (phi - 1)) + g * (2.4 - 0.271 * phi ** 3.51);
+  const b = (1 - g) * (c.beta + c.betaPhi * (phi - 1)) + g * (-0.357 + 0.14 * phi ** 2.77);
   return Math.max(sl0, 0.02) * (Tu / 298) ** a * (p / 101325) ** b * (1 - 2.06 * xDil ** 0.77);
 }
 

@@ -165,14 +165,20 @@ export function camVE(cam, inAdv, exAdv, rpm) {
 }
 
 /**
- * Residual gas mass fraction, ESTIMATE (not a gas-exchange simulation):
- *   x = 3 % + K (backRatio - 1) t_ov,  t_ov = overlap time (ms) from the mean of the 0.1 mm and 1 mm overlaps,
- *   K = 0.09 per ms, clamped 2-15 %. backRatio = exhaust/intake pressure; <= 1 adds nothing.
- * K is a judgement figure picked so 225-T1 at 1.2 back-pressure and 3500 rpm adds about 2 points.
+ * Residual gas mass fraction, ESTIMATE (not a gas-exchange simulation), after Heywood Eq. 6.21 (p. 414): x = x_IVO + x_backflow.
+ *   x_IVO = clearance-gas residual of the ideal cycle, Eq. 5.35 (p. 310):
+ *     (1/rc) (pe/pi)^(1/g) / [1 + Q* / (cv T1 rc^(g-1))]^(1/g),  g = 1.3, Q* / (cv T1) = 9.3 (rc - 1)/rc (Heywood's cycle values, p. 312);
+ *     backRatio = pe/pi. (Ex. 5.1, rc 6, pe/pi 2: 0.082 reproduced.) Gives 3.1 % at rc 9, pe/pi 1.
+ *   x_backflow: Heywood Eq. 6.20 is an integral of the overlap backflow mass flow, with no closed form or correlation in the book (Fig. 6.26,
+ *   p. 415, is data only). Kept as a judgement figure: K (backRatio - 1) t_ov, t_ov = overlap time (ms) from the mean of the 0.1 mm and
+ *   1 mm overlaps, K = 0.09 per ms (picked so 225-T1 at 1.2 back-pressure and 3500 rpm adds about 2 points); <= 1 adds nothing.
+ * Clamped 2-15 %. cr defaults to 9 (the project engine).
  */
-export function residualEstimate(events, backRatio, rpm) {
+export function residualEstimate(events, backRatio, rpm, cr = 9) {
   const ovDeg = 0.5 * (events.overlap1 + events.overlap01);
   const tMs = (ovDeg / (6 * rpm)) * 1000;
-  const x = 0.03 + 0.09 * Math.max(0, backRatio - 1) * tMs;
+  const g = 1.3, qStar = 9.3 * (cr - 1) / cr;
+  const xIvo = (1 / cr) * backRatio ** (1 / g) / (1 + qStar / cr ** (g - 1)) ** (1 / g);   // Eq. 5.35
+  const x = xIvo + 0.09 * Math.max(0, backRatio - 1) * tMs;
   return Math.min(0.15, Math.max(0.02, x));
 }
