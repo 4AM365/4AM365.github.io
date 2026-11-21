@@ -60,7 +60,7 @@ checks in `model/check-*.mjs`). The jsx is copied with its import repointed to
 To update:
 ```
 cd "Hobbies/Cars/Land Cruiser/bearing-stress-calc/model" && for f in check-*.mjs; do node $f; done
-cp model/{calc,combustion,bearing,rodpin,cams}.js  <blog>/widgets/src/src/crank-bearing-calc/
+cp model/{calc,combustion,bearing,rodpin,cams,engines}.js  <blog>/widgets/src/src/crank-bearing-calc/
 sed 's#"./model/calc.js"#"./src/crank-bearing-calc/calc.js"#' bearing-stress.jsx > <blog>/widgets/src/crank-bearing-calc.jsx
 cd <blog> && node "<source>/build-one.mjs" crank-bearing-calc && git commit ... && git push
 ```
