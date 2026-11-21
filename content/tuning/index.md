@@ -18,3 +18,4 @@ Interactive, runs-in-your-browser tools:
 
 - [[combustion-cov|Combustion-stability (CoV) calculator]] — read CoV proxies (crank-speed jitter + per-cylinder knock scatter) from an EMU Black log
 - [[valve-clearance|Piston-to-valve clearance calculator]] — P2V clearance through the overlap, relative to stock
+- [[crank-bearing-calc|Crank bearing stress calculator]] — a simple bearing stress solver based on inputs: bearing loads and oil film, wrist pin, rod buckling, torque ceiling
