@@ -77,7 +77,9 @@ function laminarSpeed(c, phi, Tu, p, xDil) {
   return Math.max(sl0, 0.02) * (Tu / 298) ** a * (p / 101325) ** b * (1 - 2.06 * xDil ** 0.77);
 }
 
-const WIEBE_A = 6.9, WIEBE_M = 2;
+// Heywood p. 683: measured mass-fraction-burned curves are fitted with a = 5, m = 2 (was a = 6.9, the "99.9 % at the end" convention).
+// The burn law is parameterised by the 10-90 % duration, so a only rescales the total duration dthTot; angles and CA10/50/90 are unchanged.
+const WIEBE_A = 5, WIEBE_M = 2;
 // Wiebe fractions where x = 10 % and 90 % in u = (th - th0)/dth_total
 const U10 = (-Math.log(0.9) / WIEBE_A) ** (1 / (WIEBE_M + 1));
 const U90 = (-Math.log(0.1) / WIEBE_A) ** (1 / (WIEBE_M + 1));
