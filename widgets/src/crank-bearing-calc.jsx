@@ -576,7 +576,7 @@ export default function BearingStress() {
               <Num k="bore" ui={ui} set={set} label="Bore" unit="mm" /><Num k="stroke" ui={ui} set={set} label="Stroke" unit="mm" />
               <Num k="rod" ui={ui} set={set} label="Rod length c-c" unit="mm" est="Manley" /><Num k="cr" ui={ui} set={set} label="Compression ratio" step="0.1" />
               <Num k="pinOffset" ui={ui} set={set} label="Pin offset" unit="mm" step="0.1" /><Num k="desaxe" ui={ui} set={set} label={"Desaxé"} unit="mm" step="0.1" />
-              <Num k="mRec" ui={ui} set={set} label="Recip. mass" unit="kg" step="0.01" est="Manley 800 g, split est." /><Num k="mRot" ui={ui} set={set} label="Rotating mass" unit="kg" step="0.01" est="Manley 800 g, split est." />
+              <Num k="mRec" ui={ui} set={set} label="Recip. mass" unit="kg" step="0.01" est={ui.engine === "2JZ" ? "GTE rod 761 g, photo CG split" : "Manley 800 g, split est."} /><Num k="mRot" ui={ui} set={set} label="Rotating mass" unit="kg" step="0.01" est={ui.engine === "2JZ" ? "GTE rod 761 g, photo CG split" : "Manley 800 g, split est."} />
             </Det>
             <Det title="Bearings">
               <Sel k="rodClr" ui={ui} set={set} label="Rod clearance" opts={OPTIONS.clearance} />

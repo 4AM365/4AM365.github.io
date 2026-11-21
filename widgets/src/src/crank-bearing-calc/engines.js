@@ -40,7 +40,9 @@ const FZ = {
 
 // ---- 2JZ-GE block, VVT-i head (MKIV Supra), stock bottom end --------------------------------------------------
 // Masses: piston 407 g + pin 132 g [forum, GTE parts; the GE 10:1 piston is not the GTE piston] + rings 30 g (est.) = 0.569 kg.
-// Stock rod ~0.80 kg with bearing [forum, GTE], 1/3 small end (est.) = 0.267 kg: mRec = 0.569 + 0.267 = 0.836, mRot = 0.533.
+// Stock GTE rod 761 g stripped / 800 g with bearing [forum]. Small-end share 0.245 of the stripped rod = 187 g, from the centre of
+// mass of the photo-derived envelope (photos/gte_rod_envelope.py, stock-gte-rod.md); the bearing (39 g) rides the big end.
+// mRec = 0.569 + 0.187 = 0.756, mRot = 0.574 + 0.039 = 0.613. (Before 2026-11-21: 1/3 split est., 0.836 / 0.533.)
 // Cross-check: piston 407 + pin 132 + rings 30 + rod 800 = 1369 g against the 1342 g complete GTE assembly figure (+2 %).
 // Pin: OD 22.0 [FSM]. ID 13.0 and length 68 are back-solved/estimated together: a 22 mm OD steel pin 68 mm long weighs 132 g
 // (the forum figure) at ID 13.0 mm.
@@ -55,14 +57,17 @@ const JZ = {
   clr: { rod: { min: 0.023, mid: 0.032, max: 0.041 }, main: { min: 0.026, mid: 0.033, max: 0.040 } },   // FSM std, diametral mm
   defaults: {
     rpm: 5500, mapKPa: 236, targetTorqueLbft: 475, spark: 20, fuel: "E60", lambda: 0.8,
-    bore: 86, stroke: 86, rod: 142, cr: 10.0, mRec: 0.836, mRot: 0.533,
+    bore: 86, stroke: 86, rod: 142, cr: 10.0, mRec: 0.756, mRot: 0.613,
     rodClrCustom: 0.032, mainClrCustom: 0.033,
     rodWidth: 19.3, mainWidth: 20.0, mainPitch: 98,
     oil: "10W-40", sumpC: 100, oilPsi: 84, feedMain: 5, feedRod: 4,
     mPistonGroup: 0.569, pinOD: 22.0, pinID: 13.0, pinLength: 68, smallEndWidth: 22, bossLength: 20,
-    // Stock I-beam rod, section estimated: rails at the swing-plane edges (x), depth 20 mm, rail width (z) 14, rail 3.0 (x), web 4.0 (z).
-    // Stock forged steel, yield 650 MPa (est.).
-    rodOrient: "I", beamHeight: 20, flangeWidth: 14, flangeThk: 3.0, webThk: 4.0, rodYield: 650,
+    // Stock 2JZ-GTE I-beam rod, reverse-engineered from a photo (stock-gte-rod.md): rails at the swing-plane edges (x).
+    // Measured on the photo, scaled from the 55.03 mm housing bore and 22.01 mm bushing ID: shank width 19.5 mm at mid-length,
+    // rail 6.6 (x). Not visible face-on, solved so the envelope x 7.85 g/cm3 = 761 g: forged depth 16.9 (z), web 5.1 (z) at
+    // tw = 0.3 B (est.). Stock forged steel, yield 650 MPa (est.).
+    rodLabel: "Stock 2JZ-GTE I-beam (photo-measured, depth mass-solved to 761 g)",
+    rodOrient: "I", beamHeight: 19.5, flangeWidth: 16.9, flangeThk: 6.6, webThk: 5.1, rodYield: 650,
     boltPreloadKN: 28, boltShankD: 8.0,                                         // stock cap bolts, both est.
     cam: "BC0311-S2", backRatio: 0.9,
   },
@@ -87,11 +92,11 @@ const JZ = {
   tags: {
     bore: "FSM", stroke: "typ (web)", rod: "catalogue (Eagle)", cr: "build notes", fuel: "build notes (E60 mid blend)", lambda: "est.",
     mapKPa: "build notes (135 kPa gauge)", rpm: "est. operating point", spark: "build notes (tune blend, derived)", targetTorqueLbft: "build notes",
-    mRec: "forum (GTE piston 407 g, pin 132 g) + est. rings 30 g + est. small end 1/3 of 0.80 kg rod", mRot: "forum (0.80 kg rod) / est. split",
+    mRec: "forum (GTE piston 407 g, pin 132 g) + est. rings 30 g + small end 187 g (photo envelope CG)", mRot: "forum (761 g rod + 39 g bearing) / photo envelope CG split",
     mPistonGroup: "forum + est. rings", pinOD: "FSM", pinID: "est. (back-solved from 132 g)", pinLength: "est.", smallEndWidth: "est.", bossLength: "est.",
     rodWidth: "catalogue (ACL 6B8100)", mainWidth: "est. (prior code)", mainPitch: "est. (typ JZ-family bore spacing, not cited)",
     journals: "FSM", clr: "FSM", oilPsi: "build notes (5.8 bar hot, 3000-3500 rpm)", oil: "est.", sumpC: "est. (82 C thermostat plate, CLT 95-111 C)",
-    feedMain: "est.", feedRod: "est.", rodOrient: "est.", beamHeight: "est.", flangeWidth: "est.", flangeThk: "est.", webThk: "est.", rodYield: "est.",
+    feedMain: "est.", feedRod: "est.", rodOrient: "photo", beamHeight: "photo (stock GTE rod)", flangeWidth: "mass-solved (761 g, tw = 0.3 B est.)", flangeThk: "photo", webThk: "mass-solved (tw = 0.3 B est.)", rodYield: "est.",
     boltPreloadKN: "est.", boltShankD: "est.", backRatio: "build notes (measured EMAP/MAP)", cam: "build notes (BC0311 S2)",
     veBasis: "build notes (measured EMU VE table 1, 2026-06-29 CSV)", stockCam: "est., unverified (web)",
   },
