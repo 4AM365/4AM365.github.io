@@ -92,7 +92,11 @@ export function cylinderPressure(op, g) {
   const Sp = 2 * g.stroke * op.rpm / 60;
 
   // Trapped mass. VE is referenced to manifold density at tCharge on the swept volume (air only).
-  const mAir = op.ve * op.map / (R_GAS * op.tCharge) * K.vd;
+  // Residual/EGR displaces fresh charge (2026-11-21). VE (cam curve or manual) is read as fresh-air VE at the reference
+  // dilution X_REF = 5 % (the default, and close to the stock-cam residual estimate), so fresh air scales by
+  // (1 - x)/(1 - X_REF) and total trapped mass stays near what the cylinder holds. At 5 % nothing changes.
+  const X_REF = 0.05;
+  const mAir = op.ve * op.map / (R_GAS * op.tCharge) * K.vd * (1 - dil) / (1 - X_REF);
   const mFuel = mAir / (lam * f.afrSt);
   const mTot = (mAir + mFuel) / (1 - dil);          // residual/EGR mass rides on top of the fresh charge
   // Charge cooling: 35 % of the fuel's heat of vaporisation is drawn from the air stream (rest from walls/ports);

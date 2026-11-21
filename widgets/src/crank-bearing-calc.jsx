@@ -475,6 +475,7 @@ export default function BearingStress() {
               <Num k="mixing" ui={ui} set={set} label="Mixing quality 0-1" step="0.05" />
               <Num k="tumble" ui={ui} set={set} label="Tumble factor" step="0.05" />
               <Num k="tCharge" ui={ui} set={set} label="Charge temp at IVC" unit={deg + "C"} />
+              <Num k="backRatio" ui={ui} set={set} label="Exhaust/intake pressure ratio" step="0.05" est />
               <Num k="ve" ui={ui} set={set} label={ui.veMode === "cam" ? "Volumetric eff. (cam)" : "Volumetric eff."} step="0.01" disabled={ui.veMode === "cam"} shown={ui.veMode === "cam" && r && r.cam ? +r.cam.ve.toFixed(3) : undefined} />
             </Det>
             <Det title="Geometry">
@@ -617,10 +618,10 @@ const EQ = {
     ["x = r cos θ + l cos φ;  V = V_c + A (x_{TDC} − x);  x_{TDC} = √((l + r)^{2} − e^{2})", "Piston height above the crank axis and cylinder volume. A = πB^{2}/4."],
     ["V_d = A (x_{TDC} − x_{BDC});  V_c = V_d / (CR − 1);  dV/dθ = A r sin(θ + φ) / cos φ", "Swept and clearance volume; analytic volume rate."],
     { h: "Charge at IVC" },
-    ["m_{air} = VE · MAP · V_d / (R T_c);  m_{fuel} = m_{air} / (λ · AFR_{st});  m_{tot} = (m_{air} + m_{fuel}) / (1 − x_d)", "R = 287 J/kg·K for everything (shortcut: no composition shift). T_c = charge temperature input. x_d = dilution mass fraction."],
+    ["m_{air} = VE · MAP · V_d / (R T_c) · (1 − x_d)/(1 − 0.05);  m_{fuel} = m_{air} / (λ · AFR_{st});  m_{tot} = (m_{air} + m_{fuel}) / (1 − x_d)", "R = 287 J/kg·K for everything (shortcut: no composition shift). T_c = charge temperature input. x_d = dilution mass fraction. Residual/EGR displaces fresh air: VE is read as fresh-air VE at 5 % dilution, so more dilution means less air."],
     ["T_{mix} = T_c − 0.35 m_{fuel} h_{fg} / (m_{air} c_p);  T_{IVC} = (1 − x_d) T_{mix} + x_d · 900 K;  p_{IVC} = m_{tot} R T_{IVC} / V_{IVC}", "35 % of the fuel's heat of vaporisation cools the air (c_p = 1005 J/kg·K); residual/EGR enters at 900 K. IVC and EVO come from the cam's 1 mm events."],
     { h: "Cylinder pressure, single zone, closed cycle IVC to EVO" },
-    ["dp/dθ = [ (γ − 1)(dQ_c/dθ − dQ_w/dθ) − γ p dV/dθ ] / V;   T = p V / (m_{tot} R)", "First law per 0.5° step, Heun (RK2). Gas-exchange: p = MAP before IVC; after EVO it ramps linearly over 60° to 1.2 · MAP (back-pressure ratio)."],
+    ["dp/dθ = [ (γ − 1)(dQ_c/dθ − dQ_w/dθ) − γ p dV/dθ ] / V;   T = p V / (m_{tot} R)", "First law per 0.5° step, Heun (RK2). Gas-exchange: p = MAP before IVC; after EVO it ramps linearly over 60° to BR · MAP, BR = exhaust/intake pressure ratio input (default 1.2); the exhaust stroke at BR · MAP sets pumping work."],
     ["γ(T) = min(1.40, 1.38 − 0.12 (T − 300) / 2200)", "Linear fit: 1.38 at 300 K, 1.26 at 2500 K."],
     ["x_b = 1 − exp(−6.9 u^{3});  u = (θ − θ_0)/Δθ;   dQ_c/dθ = Q_{tot} · 6.9 · 3 u^{2} exp(−6.9 u^{3}) / Δθ", "Wiebe, a = 6.9, m = 2."],
     ["Q_{tot} = m_{fuel} · LHV · η_c;  η_c = η_λ η_q;  η_λ = 1 (λ ≥ 1), else max(0.5, 1 − 1.2 (1 − λ));  η_q = 0.98 − 0.10 (1 − q)", "Rich mixtures lose 1.2 % of fuel energy per 1 % enrichment; q = mixing quality. LHV: gasoline 43.0, ethanol 26.8, methanol 19.9 MJ/kg."],
@@ -735,7 +736,7 @@ const EQ = {
     ["TA = ∫ Q(h(t)) dt over the intake event;   Q from a PCHIP of (h/D = 0, .1, .2, .25, .3, .35, 1) → (0, .42, .78, .90, .97, 1, 1) × 245 cfm", "D = 37 mm valve (assumed). The flow curve and 245 cfm peak are as in project.py."],
     ["VE_{stock} = [ (T_q · 1.3558 · 4π / V_d + FMEP + 0.15 bar) / (1 − 0.02) ] / (ρ_{ref} Q_{gas} η_{gas})", "Back-calculated from an assumed stock torque curve (shape assumed, extrapolated above 4600 rpm): ρ_{ref} = 99 kPa/(287 · 298.15), Q_{gas} = 2.93 MJ/kg, η = 0.37, V_d = 4.477 L. An estimate."],
     { h: "Residual gas" },
-    ["x_{res} = 0.03 + 0.09 (BR − 1) t_{ov};   t_{ov} [ms] = overlap_{mean} / (6N) · 1000;   clamp 2–15 %", "overlap_{mean} = mean of the 0.1 mm and 1 mm overlaps; BR = 1.2 exhaust/intake pressure. The 0.09 per ms is a judgement figure, not a gas-exchange simulation."],
+    ["x_{res} = 0.03 + 0.09 (BR − 1) t_{ov};   t_{ov} [ms] = overlap_{mean} / (6N) · 1000;   clamp 2–15 %", "overlap_{mean} = mean of the 0.1 mm and 1 mm overlaps; BR = exhaust/intake pressure ratio input (default 1.2). The 0.09 per ms is a judgement figure, not a gas-exchange simulation."],
     ["Dilution mode 'cam': x_d = x_{res} (EGR = 0), otherwise the manual dilution %", "Feeds the charge-temperature mix and the flame-speed dilution factor on the Overview tab."],
   ],
 };

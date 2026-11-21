@@ -7,7 +7,7 @@ import { CAMS, liftCurve, camEvents, camVE, residualEstimate } from "./cams.js";
 const LBFT = 1.3558179483314, BAR = 1e5;
 // Fixed, not exposed: exhaust/intake pressure ratio (as bearing_limits.py), friction (project.py).
 // IVC/EVO come from the selected cam's 1 mm events (v0.3); stock gives IVC -148, as the prior fixed value.
-const BACK_RATIO = 1.2, FRIC_LOAD = 0.02;
+const FRIC_LOAD = 0.02;   // exhaust/intake pressure ratio is the backRatio input (2026-11-21; was fixed 1.2)
 const fmep = (n) => (0.6 + 0.1 * n / 1000 + 0.02 * (n / 1000) ** 2) * BAR;
 const CLR = { rod: { min: 0.032, mid: 0.041, max: 0.050 }, main: { min: 0.042, mid: 0.051, max: 0.060 } };   // FSM EG-172, diametral mm
 
@@ -29,7 +29,7 @@ export const DEFAULTS = {
   // ARP 2000 3/8 cap screws (Manley 42351-1): preload from 0.006 in stretch ~50 kN (range 44-56), shank dia ~7.9 mm (est.)
   boltPreloadKN: 50, boltShankD: 7.9,
   // v0.3 — camshaft: grind, cam-gear advance (deg, + earlier), VE from cam or manual box, dilution manual or overlap residual
-  cam: "Stock", inAdv: 0, exAdv: 0, veMode: "cam", dilMode: "manual",
+  cam: "Stock", inAdv: 0, exAdv: 0, veMode: "cam", dilMode: "manual", backRatio: 1.2,
 };
 
 const mm = (v) => v / 1000;
@@ -39,13 +39,13 @@ function geomOf(u) {
 function camState(u) {
   const cam = CAMS[u.cam] || CAMS.Stock, ev = camEvents(cam, u.inAdv, u.exAdv);
   const ve = u.veMode === "manual" ? u.ve : camVE(cam, u.inAdv, u.exAdv, u.rpm);
-  const residual = residualEstimate(ev, BACK_RATIO, u.rpm);
+  const residual = residualEstimate(ev, u.backRatio, u.rpm);
   return { cam, ev, ve, residual, dilution: u.dilMode === "cam" ? residual : u.dilution / 100 };
 }
 function opOf(u, mapKPa, spark) {
   const cs = camState(u);
   return { fuel: u.fuel, lambda: u.lambda, dilution: cs.dilution, mixing: u.mixing, tumble: u.tumble, spark, rpm: u.rpm,
-    map: mapKPa * 1000, tCharge: u.tCharge + 273.15, ve: cs.ve, backRatio: BACK_RATIO, ivc: cs.ev.ivc, evo: cs.ev.evo };
+    map: mapKPa * 1000, tCharge: u.tCharge + 273.15, ve: cs.ve, backRatio: u.backRatio, ivc: cs.ev.ivc, evo: cs.ev.evo };
 }
 // Camshaft tab payload: lift curves, piston position, events, effective CR from the cylinder volume at IVC (1 mm).
 function camResult(u) {
