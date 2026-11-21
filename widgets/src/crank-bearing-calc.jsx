@@ -2,7 +2,8 @@
 // Crank bearing stress calculator - UI. Imports ONLY analyze/torqueSweep/DEFAULTS/OPTIONS from the model glue.
 // Runs standalone (index.html) and as a blog widget (default export, Preact-compatible hooks only).
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { analyze, torqueSweep, DEFAULTS, OPTIONS } from "./src/crank-bearing-calc/calc.js";
+import * as calc from "./src/crank-bearing-calc/calc.js";
+const { analyze, torqueSweep, DEFAULTS, OPTIONS, engineDefaults, camsFor, solvePoint, ignRow, emuTables } = calc;
 
 const MONO = "'IBM Plex Mono', ui-monospace, monospace";
 const THEMES = {
@@ -69,7 +70,14 @@ const CSS = `
 .bsc-svg{width:100%;height:auto;display:block;touch-action:pan-y}
 `;
 
-const TABS = [["overview", "Overview"], ["mains", "Mains"], ["rod", "Rod bearing"], ["pin", "Wrist pin"], ["buck", "Rod buckling"], ["cam", "Camshaft"]];
+const ENGINE_LABELS = { "1FZ-FE": "1FZ-FE · FJ80 Land Cruiser", "2JZ": "2JZ · MKIV Supra" };
+const enginesList = ((OPTIONS && OPTIONS.engines) || []).map((e) => (typeof e === "string" ? { key: e, label: ENGINE_LABELS[e] || e } : { key: e.key || e.name, label: e.label || ENGINE_LABELS[e.key] || e.key }));
+// EMU axes (emu-table-conventions.md); boost rpm bins double as the torque-target points
+const MAPAX = {
+  "1FZ-FE": { ignRpm: [500, 750, 1000, 1250, 1500, 1750, 2000, 2250, 2500, 2750, 3000, 3250, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000], ignMap: [20, 35, 50, 65, 80, 100, 125, 150, 175, 200, 230, 260, 290, 325, 360, 400], boostRpm: [2000, 2500, 3000, 4000, 5000, 6000, 6500, 7000] },
+  "2JZ": { ignRpm: [500, 842, 1184, 1526, 1868, 2211, 2553, 2895, 3237, 3579, 3921, 4263, 4605, 4947, 5289, 5632, 5974, 6316, 6658, 7000], ignMap: [20, 35, 49, 64, 79, 93, 108, 123, 137, 152, 167, 181, 196, 211, 225, 240], boostRpm: [3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000] },
+};
+const TABS = [["overview", "Overview"], ["maps", "Maps"], ["mains", "Mains"], ["rod", "Rod bearing"], ["pin", "Wrist pin"], ["buck", "Rod buckling"], ["cam", "Camshaft"]];
 const fmt = (n, dp = 1) => (n == null || !isFinite(n) ? "-" : Number(n).toFixed(dp));
 const deg = "°", mu = "µ";
 
@@ -85,7 +93,7 @@ const tickFmt = (v) => (Math.abs(v) >= 1000 ? v.toFixed(0) : String(+v.toPrecisi
 
 // ---------- generic line chart ----------
 // series: [{y, color, name, dash, axis:"r"}] ; vlines:[{x,label,color}] ; hlines:[{y,label,color}]
-function LineChart({ x, series, xlabel, ylabel, y2label, vlines = [], hlines = [], xdom, ydom, xticks, H = 250, C }) {
+function LineChart({ x, series, xlabel, ylabel, y2label, y2scale, dots = [], bands = [], vlines = [], hlines = [], xdom, ydom, xticks, H = 250, C }) {
   const W = 560, pl = 52, pr = y2label ? 48 : 14, pt = 12, pb = 38;
   const [hover, setHover] = useState(null);
   const L = series.filter((s) => s.axis !== "r"), R = series.filter((s) => s.axis === "r");
@@ -93,7 +101,7 @@ function LineChart({ x, series, xlabel, ylabel, y2label, vlines = [], hlines = [
   const ext = (S, dom) => { if (dom) return dom; const [lo, hi] = rangeOf(S.map((s) => s.y)); const pad = (hi - lo) * 0.06 || 1; return [lo - pad, hi + pad]; };
   let [yl0, yl1] = ext(L.length ? L : R, ydom);
   hlines.forEach((h) => { yl0 = Math.min(yl0, h.y - (yl1 - yl0) * 0.02); yl1 = Math.max(yl1, h.y + (yl1 - yl0) * 0.02); });
-  const [yr0, yr1] = R.length ? ext(R) : [0, 1];
+  const [yr0, yr1] = y2scale ? [yl0 * y2scale, yl1 * y2scale] : R.length ? ext(R) : [0, 1];
   const X = (v) => pl + ((v - x0) / (x1 - x0)) * (W - pl - pr);
   const YL = (v) => pt + (1 - (v - yl0) / (yl1 - yl0)) * (H - pt - pb);
   const YR = (v) => pt + (1 - (v - yr0) / (yr1 - yr0)) * (H - pt - pb);
@@ -109,14 +117,16 @@ function LineChart({ x, series, xlabel, ylabel, y2label, vlines = [], hlines = [
     <svg className="bsc-svg" viewBox={`0 0 ${W} ${H}`} onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
       {niceTicks(yl0, yl1, 5).map((v) => <g key={v}><line x1={pl} x2={W - pr} y1={YL(v)} y2={YL(v)} stroke={C.line} strokeWidth="0.6" />
         <text x={pl - 5} y={YL(v) + 3} textAnchor="end" fontSize="10" fill={C.soft} fontFamily={MONO}>{tickFmt(v)}</text></g>)}
-      {R.length > 0 && niceTicks(yr0, yr1, 5).map((v) => <text key={v} x={W - pr + 5} y={YR(v) + 3} fontSize="10" fill={C.soft} fontFamily={MONO}>{tickFmt(v)}</text>)}
+      {(R.length > 0 || y2scale) && niceTicks(yr0, yr1, 5).map((v) => <text key={v} x={W - pr + 5} y={YR(v) + 3} fontSize="10" fill={C.soft} fontFamily={MONO}>{tickFmt(v)}</text>)}
       {xt.map((v) => <g key={v}><line x1={X(v)} x2={X(v)} y1={pt} y2={H - pb} stroke={C.line} strokeWidth="0.4" />
         <text x={X(v)} y={H - pb + 13} textAnchor="middle" fontSize="10" fill={C.soft} fontFamily={MONO}>{tickFmt(v)}</text></g>)}
       {vlines.filter((v) => v.x >= x0 && v.x <= x1).map((v, i) => <g key={i}><line x1={X(v.x)} x2={X(v.x)} y1={pt} y2={H - pb} stroke={v.color} strokeWidth="1" strokeDasharray="4 3" />
         <text x={X(v.x) + 2} y={pt + 9 + (i % 4) * 10} fontSize="9.5" fill={v.color} fontFamily={MONO}>{v.label}</text></g>)}
       {hlines.map((h, i) => <g key={i}><line x1={pl} x2={W - pr} y1={YL(h.y)} y2={YL(h.y)} stroke={h.color} strokeWidth="1.2" strokeDasharray="5 3" />
         <text x={W - pr - 2} y={YL(h.y) - 3} textAnchor="end" fontSize="9.5" fill={h.color} fontFamily={MONO}>{h.label}</text></g>)}
+      {bands.map((b, i) => <path key={"b" + i} d={b.x.map((xv, j) => (j ? "L" : "M") + X(xv).toFixed(1) + " " + YL(b.y0[j]).toFixed(1)).join("") + b.x.map((xv, j) => "L" + X(b.x[b.x.length - 1 - j]).toFixed(1) + " " + YL(b.y1[b.x.length - 1 - j]).toFixed(1)).join("") + "Z"} fill={b.color} opacity="0.22" stroke="none" />)}
       {series.map((s, i) => <path key={i} d={path(s)} fill="none" stroke={s.color} strokeWidth="1.8" strokeDasharray={s.dash} opacity={s.faint ? 0.55 : 1} />)}
+      {dots.map((d, i) => <circle key={"d" + i} cx={X(d.x)} cy={YL(d.y)} r="4.5" fill={d.bad ? C.bad : d.color} stroke={C.bg} strokeWidth="1" />)}
       <rect x={pl} y={pt} width={W - pl - pr} height={H - pt - pb} fill="none" stroke={C.line} />
       <text x={(pl + W - pr) / 2} y={H - 4} textAnchor="middle" fontSize="11" fill={C.soft}>{xlabel}</text>
       <text transform={`translate(12 ${(pt + H - pb) / 2}) rotate(-90)`} textAnchor="middle" fontSize="11" fill={C.soft}>{ylabel}</text>
@@ -211,8 +221,27 @@ export default function BearingStress() {
     return () => document.removeEventListener("themechange", onTheme);
   }, []);
 
-  const [ui, setUi] = useState({ ...DEFAULTS });
+  const initUi = useMemo(() => {
+    let k = null; try { k = localStorage.getItem("bsc-engine"); } catch {}
+    const ks = enginesList.map((e) => e.key);
+    if (engineDefaults && k && ks.includes(k)) { try { return { ...engineDefaults(k), engine: k }; } catch {} }
+    return { ...DEFAULTS };
+  }, []);
+  const baseRef = useRef(initUi);
+  const [ui, setUi] = useState(initUi);
   const [applied, setApplied] = useState(ui);
+  const preset = useMemo(() => { try { return engineDefaults && ui.engine ? engineDefaults(ui.engine) : null; } catch { return null; } }, [ui.engine]);
+  const camList = (camsFor && ui.engine ? camsFor(ui.engine) : OPTIONS.cams) || [];
+  const [mcfg, setMcfg] = useState(() => { const c = { flat: initUi.engine === "2JZ" ? 475 : 600, ratingFrac: 1.0, maxMap: 400, spool: 60 }; for (let i = 0; i < 8; i++) c["t" + i] = c.flat; return c; });
+  const setM = (k, v) => setMcfg((c) => ({ ...c, [k]: v }));
+  const [maps, setMaps] = useState(null), [mprog, setMprog] = useState(null);
+  const switchEngine = (k) => {
+    if (k === ui.engine || !engineDefaults) return;
+    if (JSON.stringify(ui) !== JSON.stringify(baseRef.current) && !window.confirm("Switching engine replaces your edited inputs with the preset. Continue?")) return;
+    const d = { ...engineDefaults(k), engine: k }; baseRef.current = d; setUi(d); setApplied(d); setSweep(null); setMaps(null);
+    const f = k === "2JZ" ? 475 : 600; setMcfg((c) => { const n = { ...c, flat: f }; for (let i = 0; i < 8; i++) n["t" + i] = f; return n; });
+    try { localStorage.setItem("bsc-engine", k); } catch {}
+  };
   const set = (k, v) => setUi((u) => ({ ...u, [k]: v }));
   useEffect(() => { const t = setTimeout(() => setApplied(ui), 250); return () => clearTimeout(t); }, [ui]);
   const pending = applied !== ui;
@@ -243,6 +272,22 @@ export default function BearingStress() {
     setTimeout(() => step(0), 30);
   };
 
+  const MAPAX_ = MAPAX[applied.engine || "1FZ-FE"] || MAPAX["1FZ-FE"];
+  const runMaps = () => {
+    const snap = applied, ax = MAPAX_, opts = { ratingFrac: mcfg.ratingFrac, maxMapKPa: mcfg.maxMap, spoolKPa: mcfg.spool }, pts = [], rows = [];
+    const N1 = ax.boostRpm.length, N2 = ax.ignRpm.length; setMprog({ phase: "solving points", i: 0, n: N1 + N2 + 1 });
+    const step = (k) => {
+      if (!alive.current) return;
+      try {
+        if (k < N1) pts.push(solvePoint(snap, ax.boostRpm[k], mcfg["t" + k], opts));
+        else if (k < N1 + N2) rows.push(ignRow(snap, ax.ignRpm[k - N1], ax.ignMap, opts));
+        else { const tables = emuTables(snap, pts, rows, opts); setMaps({ pts, tables, ui: snap }); setMprog(null); return; }
+      } catch (e) { setMprog(null); setMaps({ pts, error: String((e && e.message) || e), ui: snap }); return; }
+      setMprog({ phase: k + 1 < N1 ? "solving points" : k + 1 < N1 + N2 ? "ignition rows" : "tables", i: k + 1, n: N1 + N2 + 1 }); setTimeout(() => step(k + 1), 20);
+    };
+    setTimeout(() => step(0), 30);
+  };
+  const mp = maps && maps.pts;
   const rating = applied.ratingMPa, minFilm = applied.minFilmUm;
   const pctCol = (p) => (p > 100 ? C.bad : p > 85 ? C.warn : C.ok);
   const filmCol = (h) => (h < minFilm ? C.bad : h < 1.5 * minFilm ? C.warn : C.ok);
@@ -311,6 +356,54 @@ export default function BearingStress() {
             {sweep && sweep.error && <span style={{ color: C.bad, fontSize: 12 }}>{sweep.error}</span>}</div>
           {sw && sw.length > 0 && <SweepChart pts={sw} C={C} />}</div>
         <Eqs items={EQ.overview} />
+      </div>}
+      {tab === "maps" && <div className="bsc-charts">
+        <div className="bsc-panel bsc-wide"><h3>Torque target and solver</h3>
+          <div className="bsc-note">Ignition is MBT with bearing-limited retard only (no knock model). Run with the fuel the table is for: table 1 (E0) → 91, table 2 (E100) → E100. Fuel in use: <b>{applied.fuel}</b>.</div>
+          {!(solvePoint && ignRow && emuTables) ? <Missing what="map solver (solvePoint / ignRow / emuTables)" /> : <>
+            <div className="bsc-body" style={{ padding: 0, gridTemplateColumns: "repeat(auto-fill,minmax(92px,1fr))" }}>
+              {MAPAX_.boostRpm.map((rpm, i) => <Num key={rpm} k={"t" + i} ui={mcfg} set={setM} label={`${rpm} rpm`} unit="lb-ft" step="5" />)}</div>
+            <div className="bsc-body" style={{ padding: "10px 0 0", gridTemplateColumns: "repeat(auto-fill,minmax(130px,1fr))" }}>
+              <Num k="flat" ui={mcfg} set={setM} label="Flat target" unit="lb-ft" step="5" />
+              <div className="bsc-f"><span>&nbsp;</span><button className="bsc-btn sm alt" onClick={() => setMcfg((c) => { const n = { ...c }; MAPAX_.boostRpm.forEach((_, i) => { n["t" + i] = c.flat; }); return n; })}>Flat quick-fill</button></div>
+              <Num k="ratingFrac" ui={mcfg} set={setM} label="Rating fraction" step="0.05" />
+              <Num k="maxMap" ui={mcfg} set={setM} label="Max MAP (abs)" unit="kPa" />
+              <Num k="spool" ui={mcfg} set={setM} label="Spool boost (gauge)" unit="kPa" /></div>
+            <div className="bsc-row" style={{ marginTop: 10, alignItems: "center" }}>
+              <button className="bsc-btn" disabled={!!mprog} onClick={runMaps}>{mprog ? "solving..." : maps ? "Re-solve maps" : "Solve maps"}</button>
+              {mprog && <div style={{ flex: 1, minWidth: 160 }}><div style={{ height: 8, background: "var(--panel2)", borderRadius: 4, overflow: "hidden" }}><div style={{ height: "100%", width: `${(100 * mprog.i) / mprog.n}%`, background: "var(--accent)" }} /></div>
+                <div className="bsc-note" style={{ margin: "2px 0 0" }}>{mprog.phase} {mprog.i}/{mprog.n}</div></div>}
+              {maps && maps.ui !== applied && !mprog && <span className="bsc-note" style={{ margin: 0 }}>inputs changed since this solve</span>}
+              {maps && maps.error && <span style={{ color: C.bad, fontSize: 12 }}>{maps.error}</span>}</div></>}</div>
+        {mp && mp.length > 0 && (() => {
+          const x = mp.map((p) => p.rpm), col = (p) => (p.feasible ? C.ok : C.bad), g = (k) => mp.map((p) => p[k]);
+          const ok = (p) => p.feasible, rf = maps.ui.ratingFrac ?? mcfg.ratingFrac;
+          return <>
+            <div className="bsc-panel"><h3>Target vs achieved torque</h3>
+              <LineChart C={C} x={x} xlabel="engine speed (rpm)" ylabel="torque (lb-ft)" series={[{ y: g("targetLbft"), color: C.soft, name: "target", dash: "5 3" }, { y: g("achievedLbft"), color: C.c[0], name: "achieved" }]}
+                dots={mp.map((p) => ({ x: p.rpm, y: p.achievedLbft, color: col(p), bad: !p.feasible }))} />
+              <Legend items={[{ color: C.soft, name: "target" }, { color: C.c[0], name: "achieved" }, { color: C.bad, name: "red dot = infeasible" }]} />
+              <div className="bsc-note">{mp.filter((p) => !ok(p)).map((p) => `${p.rpm}: ${p.note || p.binding}`).join(" / ") || "all points feasible"}</div></div>
+            <div className="bsc-panel"><h3>Required boost</h3>
+              <LineChart C={C} x={x} xlabel="engine speed (rpm)" ylabel="boost (kPa gauge)" y2label="boost (psi)" y2scale={1 / 6.895} series={[{ y: g("boostGauge"), color: C.c[1], name: "kPa gauge" }]}
+                dots={mp.map((p) => ({ x: p.rpm, y: p.boostGauge, color: C.c[1], bad: !p.feasible }))} />
+              <div className="bsc-note">MAP abs = {mp.map((p) => `${p.rpm}: ${fmt(p.mapKPa, 0)}`).join(" / ")} kPa</div></div>
+            <div className="bsc-panel"><h3>Spark vs MBT</h3>
+              <LineChart C={C} x={x} xlabel="engine speed (rpm)" ylabel={`spark (${deg} BTDC)`} series={[{ y: g("mbt"), color: C.c[3], name: "MBT", dash: "5 3" }, { y: g("spark"), color: C.c[2], name: "spark" }]}
+                bands={[{ x, y0: g("spark"), y1: g("mbt"), color: C.c[2] }]} />
+              <Legend items={[{ color: C.c[3], name: "MBT" }, { color: C.c[2], name: "spark used (shaded = retard)" }]} /></div>
+            <div className="bsc-panel"><h3>Bearing load at the solution</h3>
+              <LineChart C={C} x={x} xlabel="engine speed (rpm)" ylabel="% of rating" series={[{ y: g("rodPct"), color: C.c[2], name: "rod" }, { y: g("mainPct"), color: C.c[1], name: "main" }]}
+                hlines={[{ y: 100 * rf, label: `limit ${fmt(100 * rf, 0)}%`, color: C.bad }]} />
+              <Legend items={[{ color: C.c[2], name: "rod" }, { color: C.c[1], name: "worst main" }]} /></div>
+          </>;
+        })()}
+        {maps && maps.tables && <>
+          <div className="bsc-panel bsc-wide"><h3>EMU ignition table (deg BTDC)</h3><div className="bsc-note">MAP kPa absolute across, rpm down (descending). Colour: advance, low (amber) to high (green).</div>
+            <Grid t={maps.tables.ign} colKey="mapBins" kind="ign" dp={1} C={C} /><CsvBar id="ign" csv={maps.tables.ign.csv} /></div>
+          <div className="bsc-panel bsc-wide"><h3>Boost target table (kPa gauge)</h3><div className="bsc-note">Pedal % across, rpm down (descending). Spool retention ramps from {maps.ui.spoolKPa ?? mcfg.spool} kPa at 0 % pedal.</div>
+            <Grid t={maps.tables.boost} colKey="pedalBins" kind="boost" dp={0} C={C} /><CsvBar id="boost" csv={maps.tables.boost.csv} /></div></>}
+        <Eqs items={EQ.maps} />
       </div>}
       {tab === "mains" && <div className="bsc-charts">
         <div className="bsc-panel"><h3>Polar load - worst main (no. {r.worstMain + 1})</h3><div className="bsc-note">block frame, x across engine, y up the bore</div>
@@ -435,7 +528,8 @@ export default function BearingStress() {
       <style>{CSS}</style>
       <div className="bsc-wrap">
         {!embedded && <h1 className="bsc-h1">Crank Bearing Stress Calculator</h1>}
-        {!embedded && <p className="bsc-sub">Peak bearing unit load, minimum oil film and the torque ceiling they set - 1FZ-FE defaults. A comparison tool: trust differences between settings more than any absolute figure.</p>}
+        {!embedded && <p className="bsc-sub">Peak bearing unit load, minimum oil film, the torque ceiling they set, and the boost and timing maps for a torque target. Presets: 1FZ-FE and 2JZ. A comparison tool: trust differences between settings more than any absolute figure.</p>}
+        {enginesList.length > 1 && engineDefaults && <div className="bsc-tabs" style={{ marginBottom: 14 }}>{enginesList.map((e) => <button key={e.key} className={"bsc-tab" + (ui.engine === e.key ? " on" : "")} onClick={() => switchEngine(e.key)}>{e.label}</button>)}</div>}
         <div className="bsc-main">
           <div>
             <Det title="Operating point" open>
@@ -497,7 +591,7 @@ export default function BearingStress() {
             </Det>
             <Det title="Camshaft">
               <label className="bsc-f" style={{ gridColumn: "1/-1" }}><span>Grind</span>
-                <select value={ui.cam} onChange={(e) => set("cam", e.target.value)}>{(OPTIONS.cams || []).map((o) => { const n = typeof o === "string" ? o : o.name; return <option key={n} value={n}>{n === "Stock" ? "Stock (est.)" : n}</option>; })}</select></label>
+                <select value={ui.cam} onChange={(e) => set("cam", e.target.value)}>{camList.map((o) => { const n = typeof o === "string" ? o : o.name; return <option key={n} value={n}>{n === "Stock" ? "Stock (est.)" : n}</option>; })}</select></label>
               {[["inAdv", "Intake cam-gear advance"], ["exAdv", "Exhaust cam-gear advance"]].map(([k, l]) => <div key={k} className="bsc-row" style={{ flexDirection: "column", alignItems: "stretch" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}><span>{l}</span><span style={{ fontFamily: MONO, color: "var(--accent)" }}>{ui[k] > 0 ? "+" : ""}{fmt(ui[k], 1)}{deg} (+ = earlier)</span></div>
                 <input type="range" min="-10" max="10" step="0.5" style={{ width: "100%", accentColor: C.accent }} value={ui[k]} onChange={(e) => set(k, parseFloat(e.target.value))} /></div>)}
@@ -512,7 +606,7 @@ export default function BearingStress() {
               <Num k="pinYield" ui={ui} set={set} label="Pin yield" unit="MPa" est /><Num k="pinFatigue" ui={ui} set={set} label="Pin fatigue limit" unit="MPa" est />
             </Det>
             <Det title="Rod section">
-              <div className="bsc-note" style={{ gridColumn: "1/-1", margin: 0 }}><b>Manley 14005-1 H-beam</b> (4340, ARP 2000 3/8 bolts)</div>
+              <div className="bsc-note" style={{ gridColumn: "1/-1", margin: 0 }}>{preset && preset.rodLabel ? <b>{preset.rodLabel}</b> : !ui.engine || ui.engine === "1FZ-FE" ? <><b>Manley 14005-1 H-beam</b> (4340, ARP 2000 3/8 bolts)</> : <b>Rod section (preset estimates)</b>}</div>
               <div className="bsc-row"><button className={"bsc-btn sm" + (ui.rodOrient === "I" ? " alt" : "")} onClick={() => set("rodOrient", "H")}>H-beam</button>
                 <button className={"bsc-btn sm" + (ui.rodOrient === "I" ? "" : " alt")} onClick={() => set("rodOrient", "I")}>I-beam</button></div>
               <Num k="beamHeight" ui={ui} set={set} label={ui.rodOrient === "I" ? "Beam height (x)" : "Depth along crank axis (z)"} unit="mm" step="0.5" est="photo est." />
@@ -723,6 +817,16 @@ const EQ = {
     ["SF_{sep} = F_{preload} / (F_{sep}/2);   σ_{shank} = F_{preload} / A_{shank};   A_{shank} = π D^{2} / 4", "Separation margin: the preload that must be overcome before the joint opens. Colours: < 1.0 red, < 1.5 amber."],
     ["F_{preload} ≈ δ E A / L", "ARP stretch method: δ = 0.006 in (0.152 mm), E = 207 GPa steel, reduced-shank area and stressed length are guesses (~0.31 in, ~1.2 in) giving ~50 kN. Input is the preload; this is how the default was estimated. Install spec is stretch 0.0058–0.0062 in (torque 65 ft-lb)."],
   ],
+  maps: [
+    { h: "Map solver (calc.js: solvePoint, ignRow, emuTables)" },
+    ["for each rpm bin: find MAP such that T_{brake}(MAP, spark) = target;   spark = MBT", "MAP by bisection on the same brake-torque model as the Overview tab (fuel, lambda, cam, VE as set). The torque target is brake lb-ft."],
+    ["if peak unit load > ratingFrac · rating (rod or main): retard spark, re-solving MAP for the target each time, until it fits", "Retard searched in [MBT − 25°, MBT]. Bearing limit only: there is no knock model, so detonation margin is not part of the answer."],
+    ["infeasible ⇔ no spark in [MBT − 25°, MBT] meets both bearing limits, or MAP > max MAP", "Infeasible points are drawn red; achieved torque there is the best the limits allow."],
+    ["ignition row at an rpm: for each MAP bin, MBT with bearing-limited retard; advance never higher than the bin below (EMU monotone rule); 0.5° resolution", "Cells are degrees BTDC, 16 MAP bins (absolute kPa) × 20 rpm bins, rpm descending down the rows."],
+    ["boost (kPa gauge) = MAP_{abs} − 101.3;  full-pedal column = solved line interpolated to the boost rpm bins", "EMU v3 boost target is gauge. 8 × 8: pedal % across, rpm down."],
+    ["lower pedal columns: linear ramp from spool kPa at pedal 0 to the full value at the second-highest pedal bin", "Spool retention keeps low-pedal cells non-zero (default 60 kPa). The ramp shape is a convention, not a tuned response."],
+    ["Table 1 = E0 (run with 91), table 2 = E100 (run with E100)", "Flex blending between the two tables is left to the ECU; this solver gives one fuel at a time."],
+  ],
   cam: [
     { h: "Lift shape" },
     ["h(t) = L · cos^{n}(π t / (2 t_0)),   |t| < t_0", "t = crank degrees from the lobe centre, L = net valve lift. C1 at the ends since n > 1."],
@@ -740,6 +844,24 @@ const EQ = {
     ["Dilution mode 'cam': x_d = x_{res} (EGR = 0), otherwise the manual dilution %", "Feeds the charge-temperature mix and the flame-speed dilution factor on the Overview tab."],
   ],
 };
+
+// ---------- EMU map grids ----------
+function Grid({ t, colKey, kind, dp, C }) {
+  const cols = t[colKey], rows = t.rpmBins, order = rows.map((_, i) => i).sort((a, b) => rows[b] - rows[a]);
+  let lo = Infinity, hi = -Infinity; t.cells.forEach((r) => r.forEach((v) => { if (v < lo) lo = v; if (v > hi) hi = v; }));
+  const bg = (v) => { const f = hi > lo ? (v - lo) / (hi - lo) : 0.5; return kind === "ign" ? `hsla(${40 + 100 * f},65%,50%,0.45)` : `hsla(215,70%,50%,${0.08 + 0.5 * f})`; };
+  return (
+    <div className="bsc-tblw"><table className="bsc-tbl"><thead><tr><th>rpm \ {kind === "ign" ? "MAP" : "pedal %"}</th>{cols.map((c) => <th key={c}>{c}</th>)}</tr></thead>
+      <tbody>{order.map((i) => <tr key={i}><td><b>{rows[i]}</b></td>{t.cells[i].map((v, j) => <td key={j} style={{ background: bg(v) }}>{fmt(v, dp)}</td>)}</tr>)}</tbody></table></div>
+  );
+}
+
+function CsvBar({ csv }) {
+  const [msg, setMsg] = useState(""), [show, setShow] = useState(false);
+  const copy = async () => { try { await navigator.clipboard.writeText(csv); setMsg("copied"); setShow(false); } catch { setShow(true); setMsg("clipboard blocked: select and copy below"); } };
+  return <div style={{ marginTop: 8 }}><button className="bsc-btn sm alt" onClick={copy}>Copy CSV</button> <span className="bsc-note">{msg}</span>
+    {show && <textarea readOnly value={csv} rows={8} onFocus={(e) => e.target.select()} style={{ width: "100%", fontFamily: MONO, fontSize: 11, background: "var(--bg)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: 6 }} />}</div>;
+}
 
 function SweepChart({ pts, C }) {
   const x = pts.map((p) => p.rpm), y = pts.map((p) => p.torqueLbft);

@@ -1,49 +1,50 @@
 // calc.js — glue between the UI (display units) and the two model modules (SI). The UI imports only this file.
 import { cylinderPressure, findMBT, FUELS } from "./combustion.js";
-import { bearingAnalysis, OILS, THETA } from "./bearing.js";
+import { bearingAnalysis, cylinderForces, mainLoads, phaseCylinders, OILS, THETA } from "./bearing.js";
 import { wristPin, rodColumn, peakFilmPressure } from "./rodpin.js";
-import { CAMS, liftCurve, camEvents, camVE, residualEstimate } from "./cams.js";
+import { CAMS, CAM_SETS, liftCurve, camEvents, camVE, residualEstimate } from "./cams.js";
+import { ENGINES } from "./engines.js";
 
 const LBFT = 1.3558179483314, BAR = 1e5;
 // Fixed, not exposed: exhaust/intake pressure ratio (as bearing_limits.py), friction (project.py).
 // IVC/EVO come from the selected cam's 1 mm events (v0.3); stock gives IVC -148, as the prior fixed value.
 const FRIC_LOAD = 0.02;   // exhaust/intake pressure ratio is the backRatio input (2026-11-21; was fixed 1.2)
 const fmep = (n) => (0.6 + 0.1 * n / 1000 + 0.02 * (n / 1000) ** 2) * BAR;
-const CLR = { rod: { min: 0.032, mid: 0.041, max: 0.050 }, main: { min: 0.042, mid: 0.051, max: 0.060 } };   // FSM EG-172, diametral mm
 
-export const OPTIONS = { fuels: Object.keys(FUELS), oils: Object.keys(OILS), clearance: ["min", "mid", "max", "custom"], cams: Object.keys(CAMS) };
-export const DEFAULTS = {
-  rpm: 3500, mapKPa: 200, useTarget: false, targetTorqueLbft: 600, spark: 20, sparkMbt: false, fuel: "E85", lambda: 0.8,
-  dilution: 5, mixing: 0.9, tumble: 1.0, tCharge: 45, ve: 0.9,
-  // Rod: Manley 14005-1 H-beam (Build Notes/manley-14005-rods.md): C-C 153.95 [Manley], 800 g [Manley] split 0.26 small end /
-  // 0.54 big end (est.); mRec = piston group 0.64 (est.) + 0.26.
-  bore: 100, stroke: 95, rod: 153.95, cr: 9.0, pinOffset: 0, desaxe: 0, mRec: 0.90, mRot: 0.54,
-  rodClr: "mid", rodClrCustom: 0.041, mainClr: "mid", mainClrCustom: 0.051,
-  rodWidth: 21.4, mainWidth: 23.4, grooveWidth: 0, ratingMPa: 70, minFilmUm: 1.0, edgeInLimit: false,
-  crankE: 207, webFactor: 0.45, mainPitch: 114, capKV: 1.5, capKH: 1.0,
-  oil: "15W-50", sumpC: 110, oilPsi: 60, feedMain: 6, feedRod: 5,
-  // v0.2 — wrist pin and rod column (all estimates except pinOD, FSM); mPistonGroup = piston + rings + pin, small end = mRec - mPistonGroup
-  mPistonGroup: 0.64, pinOD: 26.0, pinID: 15.0, pinLength: 66, smallEndWidth: 22, bossLength: 18, pinYield: 1100, pinFatigue: 500,
-  // Manley H-beam section, photo estimates: plates at +-z, depth (z) 21, plate width (x) 32, plates 3.5, web 6 (x). 4340 Q&T typ.
-  rodOrient: "H", beamHeight: 21, flangeWidth: 32, flangeThk: 3.5, webThk: 6.0, rodE: 205, rodYield: 950,
-  // ARP 2000 3/8 cap screws (Manley 42351-1): preload from 0.006 in stretch ~50 kN (range 44-56), shank dia ~7.9 mm (est.)
-  boltPreloadKN: 50, boltShankD: 7.9,
-  // v0.3 — camshaft: grind, cam-gear advance (deg, + earlier), VE from cam or manual box, dilution manual or overlap residual
-  cam: "Stock", inAdv: 0, exAdv: 0, veMode: "cam", dilMode: "manual", backRatio: 1.2,
+// v0.4: journals, FSM clearances and everything that differs by engine live in engines.js; BASE is what the presets share.
+// mPistonGroup = piston + rings + pin, small end = mRec - mPistonGroup. Pin/rod section/bolt values are per engine (estimates unless tagged).
+const BASE = {
+  useTarget: false, sparkMbt: false, dilution: 5, mixing: 0.9, tumble: 1.0, tCharge: 45, ve: 0.9,
+  pinOffset: 0, desaxe: 0, rodClr: "mid", mainClr: "mid", grooveWidth: 0, ratingMPa: 70, minFilmUm: 1.0, edgeInLimit: false,
+  crankE: 207, webFactor: 0.45, capKV: 1.5, capKH: 1.0, pinYield: 1100, pinFatigue: 500, rodE: 205,
+  // v0.3 — camshaft: cam-gear advance (deg, + earlier; intake VVT on the 2JZ), VE from cam or manual box, dilution manual or overlap residual
+  inAdv: 0, exAdv: 0, veMode: "cam", dilMode: "manual",
 };
+const engineKey = (k) => (ENGINES[k] ? k : "1FZ-FE");
+export const camsFor = (engine) => Object.keys(CAM_SETS[ENGINES[engineKey(engine)].camSet]);   // grind names, like OPTIONS.cams
+/** Full display-unit defaults for an engine preset ("1FZ-FE" | "2JZ"). */
+export function engineDefaults(key) {
+  const k = engineKey(key);
+  return { ...BASE, ...ENGINES[k].defaults, engine: k };
+}
+const resolve = (ui) => { const k = engineKey(ui && ui.engine); return { ...engineDefaults(k), ...ui, engine: k }; };
+const engOf = (u) => ENGINES[engineKey(u.engine)];
+const camSetOf = (u) => CAM_SETS[engOf(u).camSet];
+
+export const OPTIONS = { fuels: Object.keys(FUELS), oils: Object.keys(OILS), clearance: ["min", "mid", "max", "custom"], cams: Object.keys(CAMS), engines: Object.keys(ENGINES) };
+export const DEFAULTS = engineDefaults("1FZ-FE");
 
 const mm = (v) => v / 1000;
 function geomOf(u) {
   return { bore: mm(u.bore), stroke: mm(u.stroke), rod: mm(u.rod), cr: u.cr, offset: mm(u.pinOffset + u.desaxe) };
 }
 function camState(u) {
-  const cam = CAMS[u.cam] || CAMS.Stock, ev = camEvents(cam, u.inAdv, u.exAdv);
-  const ve = u.veMode === "manual" ? u.ve : camVE(cam, u.inAdv, u.exAdv, u.rpm);
+  const set = camSetOf(u), cam = set[u.cam] || Object.values(set)[0], ev = camEvents(cam, u.inAdv, u.exAdv);
+  const ve = u.veMode === "manual" ? u.ve : camVE(cam, u.inAdv, u.exAdv, u.rpm, engOf(u).veBasis);
   const residual = residualEstimate(ev, u.backRatio, u.rpm, u.cr);
   return { cam, ev, ve, residual, dilution: u.dilMode === "cam" ? residual : u.dilution / 100 };
 }
-function opOf(u, mapKPa, spark) {
-  const cs = camState(u);
+function opOf(u, mapKPa, spark, cs = camState(u)) {
   return { fuel: u.fuel, lambda: u.lambda, dilution: cs.dilution, mixing: u.mixing, tumble: u.tumble, spark, rpm: u.rpm,
     map: mapKPa * 1000, tCharge: u.tCharge + 273.15, ve: cs.ve, backRatio: u.backRatio, ivc: cs.ev.ivc, evo: cs.ev.evo };
 }
@@ -55,25 +56,26 @@ function camResult(u) {
   const piston = Float64Array.from(THETA, (th) => (xTdc - xAt(th)) * 1e3);
   const A = Math.PI / 4 * g.bore ** 2, vc = A * g.stroke / (g.cr - 1), vIvc = vc + A * (xTdc - xAt(cs.ev.ivc));
   const mmArr = (a) => Float64Array.from(a, (v) => v * 1e3);
-  const table = Object.entries(CAMS).map(([k, c]) => {
+  const table = Object.entries(camSetOf(u)).map(([k, c]) => {
     const ev = camEvents(c, 0, 0);
     return { grind: c.label, key: k, use: c.use, adv: { in: c.in.adv, ex: c.ex.adv }, dur1: { in: c.in.dur1, ex: c.ex.dur1 },
-      lift: { in: c.in.lift, ex: c.ex.lift }, cl: { in: c.in.cl, ex: c.ex.cl },
+      lift: { in: c.in.lift, ex: c.ex.lift }, cl: { in: c.in.cl, ex: c.ex.cl }, pts: { in: c.in.pts, ex: c.ex.pts },
       ivo: -360 - ev.ivo, ivc: ev.ivc + 180, evo: 180 - ev.evo, evc: ev.evc - 360, springs: c.springs, verified: c.verified, source: c.source };
   });
   return { name: cs.cam.label, events: cs.ev, liftIn: mmArr(liftCurve(cs.cam.in, u.inAdv)), liftEx: mmArr(liftCurve(cs.cam.ex, u.exAdv)),
     piston, ve: cs.ve, residual: cs.residual, effCR: vIvc / vc, table };
 }
 function bearingInp(u) {
+  const eng = engOf(u), CLR = eng.clr, J = eng.journals;
   const clr = (kind) => (u[kind + "Clr"] === "custom" ? u[kind + "ClrCustom"] : CLR[kind][u[kind + "Clr"]]);
   return {
     geom: geomOf(u), mass: { rec: u.mRec, rot: u.mRot, pg: Math.min(u.mPistonGroup, u.mRec) }, rpm: u.rpm,
     bearings: {
-      rod: { d: mm(57), l: mm(u.rodWidth), c: mm(clr("rod")) / 2, feedD: mm(u.feedRod), groove: 0 },
-      main: { d: mm(69), l: mm(u.mainWidth), c: mm(clr("main")) / 2, feedD: mm(u.feedMain), groove: mm(u.grooveWidth) },
+      rod: { d: mm(J.rod), l: mm(u.rodWidth), c: mm(clr("rod")) / 2, feedD: mm(u.feedRod), groove: 0 },
+      main: { d: mm(J.main), l: mm(u.mainWidth), c: mm(clr("main")) / 2, feedD: mm(u.feedMain), groove: mm(u.grooveWidth) },
     },
     rating: u.ratingMPa * 1e6, hMinAccept: u.minFilmUm * 1e-6, edgeInLimit: !!u.edgeInLimit,
-    crank: { E: u.crankE * 1e9, factor: u.webFactor, dJournal: mm(69), pitch: mm(u.mainPitch), kV: u.capKV * 1e9, kH: u.capKH * 1e9 },
+    crank: { E: u.crankE * 1e9, factor: u.webFactor, dJournal: mm(J.main), pitch: mm(u.mainPitch), kV: u.capKV * 1e9, kH: u.capKH * 1e9 },
     oil: { grade: u.oil, tSupplyK: u.sumpC + 273.15, pSupplyPa: u.oilPsi * 6894.76 },
   };
 }
@@ -128,7 +130,7 @@ function extras(u, raw, b) {
   if (pin.sfFatigue < 1) warnings.push(`Wrist pin: fatigue safety factor ${pin.sfFatigue.toFixed(2)} < 1 (not in the torque ceiling)`);
   // rod column
   const rc = rodColumn(raw.fRod, { orient: u.rodOrient, length: mm(u.rod), beamHeight: mm(u.beamHeight), flangeWidth: mm(u.flangeWidth), flangeThk: mm(u.flangeThk), webThk: mm(u.webThk),
-    pinD: mm(u.pinOD), bigEndD: mm(57) }, { E: u.rodE * 1e9, yield: u.rodYield * 1e6 });
+    pinD: mm(u.pinOD), bigEndD: mm(engOf(u).journals.rod) }, { E: u.rodE * 1e9, yield: u.rodYield * 1e6 });
   const sec = (q) => ({ leff: q.leff * 1e3, slender: q.slender, pcr: q.pcr / 1e3, sf: q.sf, regime: q.regime });
   const buckling = { load: kN(raw.fRod), peakComp: rc.peakComp / 1e3, peakCompTheta: THETA[rc.peakCompIdx], peakTens: rc.peakTens / 1e3, areaMm2: rc.area * 1e6,
     sigmaComp: rc.sigmaComp / 1e6, sigmaTens: rc.sigmaTens / 1e6, inPlane: sec(rc.inPlane), outPlane: sec(rc.outPlane), governing: rc.governing };
@@ -179,7 +181,7 @@ function evaluate(u, mapKPa) {
 }
 
 export function analyze(ui) {
-  const u = { ...DEFAULTS, ...ui };
+  const u = resolve(ui);
   const map = u.useTarget ? mapForTorque(u, geomOf(u), u.targetTorqueLbft * LBFT) : u.mapKPa;
   return evaluate(u, map);
 }
@@ -188,7 +190,7 @@ export function analyze(ui) {
 const minMargin = (r) => Math.min(...Object.values(r.limits.margins));
 export function torqueSweep(ui, rpms) {
   return rpms.map((rpm) => {
-    const u = { ...DEFAULTS, ...ui, rpm, useTarget: false };
+    const u = { ...resolve(ui), rpm, useTarget: false };
     let lo = 60, hi = 650, rLo = evaluate(u, lo);
     if (minMargin(rLo) < 0) return { rpm, torqueLbft: rLo.torque.meanLbft, mapKPa: lo, binding: rLo.limits.binding + " (already at low MAP)" };
     let rHi = evaluate(u, hi);
@@ -199,4 +201,155 @@ export function torqueSweep(ui, rpms) {
     }
     return { rpm, torqueLbft: rLo.torque.meanLbft, mapKPa: lo, binding: rHi.limits.binding };
   });
+}
+
+// ================================================================ v0.4 map solver =====================================================
+// Combustion-only torque at (MAP, spark), plus a loads-only bearing check (peak rod and main unit load against the rating; no film, no
+// temperature iteration). Rod and main peak loads rise with MAP at fixed spark, and fall as spark is retarded at fixed MAP.
+const P0 = 101.325;            // kPa, boost gauge = MAP abs - P0
+const MAP_LO = 25;             // kPa, lowest MAP the torque solve looks at
+const HALF = (x) => Math.round(x * 2) / 2;     // spark resolution 0.5 deg
+
+function solverCtx(ui, rpm) {
+  const u = { ...resolve(ui), rpm, useTarget: false }, g = geomOf(u), bi = bearingInp(u), cs = camState(u);
+  const rb = bi.bearings.rod, mb = bi.bearings.main, aRod = (rb.l - (rb.groove || 0)) * rb.d, aMain = (mb.l - (mb.groove || 0)) * mb.d;
+  const peak = (x, y) => { let m = 0; for (let i = 0; i < x.length; i++) { const v = Math.hypot(x[i], y[i]); if (v > m) m = v; } return m; };
+  return {
+    u, g, vd: vdOf(g), cs,
+    mbt: (map, tol = 0.1) => findMBT(opOf(u, map, 20, cs), g, tol),
+    burn: (map, spark) => cylinderPressure(opOf(u, map, spark, cs), g),
+    // peak unit load as % of the rating: rod bearing, worst main
+    loads(c) {
+      const F = cylinderForces(bi.geom, bi.mass, u.rpm, c.p);
+      const px = phaseCylinders(F.loadX), py = phaseCylinders(F.loadY), ml = mainLoads(px.map((x, i) => ({ x, y: py[i] })), bi.crank, u.rpm);
+      const rod = peak(F.pinX, F.pinY) / aRod / bi.rating * 100, main = Math.max(...ml.mains.map((L) => peak(L.x, L.y))) / aMain / bi.rating * 100;
+      return { rodPct: rod, mainPct: main };
+    },
+  };
+}
+
+// Root of tq(map) = target on [lo, hi]; tq rises monotonically with MAP. Illinois regula falsi, stops inside tolFrac of the target.
+function mapForTq(tq, target, lo, hi, tolFrac = 0.002) {
+  let a = lo, b = hi, fa = tq(a) - target, fb = tq(b) - target;
+  if (fa >= 0) return { map: a, status: "low" };
+  if (fb < 0) return { map: b, status: "high" };
+  let m = b, side = 0;
+  for (let k = 0; k < 40; k++) {
+    m = (a * fb - b * fa) / (fb - fa);
+    const fm = tq(m) - target;
+    if (Math.abs(fm) <= tolFrac * target || b - a < 0.05) break;
+    if (fm * fb > 0) { b = m; fb = fm; if (side === -1) fa /= 2; side = -1; } else { a = m; fa = fm; if (side === 1) fb /= 2; side = 1; }
+  }
+  return { map: m, status: "ok" };
+}
+
+/**
+ * Operating point for a brake-torque target at one rpm: the MAP (and spark) that makes lbft within the rating.
+ * Spark starts at MBT; if the rod or main peak unit load exceeds ratingFrac x rating, spark is retarded in 1 deg steps (re-solving MAP for the
+ * torque each time), then the last step is refined by 0.5 deg. Infeasible if no spark in [MBT - 25, MBT] fits, or MAP would exceed maxMapKPa.
+ */
+export function solvePoint(ui, rpm, lbft, opts = {}) {
+  const ratingFrac = opts.ratingFrac ?? 1.0, maxMap = opts.maxMapKPa ?? 400, lim = ratingFrac * 100;
+  const S = solverCtx(ui, rpm), target = lbft * LBFT, tq = (c) => brakeNm(c.imepGross, S.u.rpm, S.vd);
+  const mk = (map, spark, mbt, extra) => {
+    const c = S.burn(map, spark), L = S.loads(c), achieved = tq(c) / LBFT;
+    return { rpm, targetLbft: lbft, achievedLbft: achieved, mapKPa: map, boostGauge: map - P0, spark, mbt, retard: mbt - spark, ca50: c.ca50,
+      pmaxBar: c.pmax / BAR, rodPct: L.rodPct, mainPct: L.mainPct, binding: "none", feasible: true, note: "", ...extra };
+  };
+  // 1. MAP for the torque at MBT spark
+  const r0 = mapForTq((m) => tq(S.burn(m, S.mbt(m))), target, MAP_LO, maxMap);
+  const mbt0 = S.mbt(r0.map);
+  const p0 = mk(r0.map, mbt0, mbt0);
+  if (r0.status === "high") return { ...p0, binding: "map", feasible: false, note: `${lbft} lb-ft needs more than ${maxMap} kPa MAP (${p0.achievedLbft.toFixed(0)} lb-ft at the limit)` };
+  const fits = (p) => p.rodPct <= lim && p.mainPct <= lim;
+  if (fits(p0)) return { ...p0, note: r0.status === "low" ? `target below the ${MAP_LO} kPa torque; clamped` : "" };
+  // 2. retard until both peak unit loads fit
+  const bind = p0.rodPct >= p0.mainPct ? "rod" : "main";
+  const loadOf = (p) => Math.max(p.rodPct, p.mainPct);
+  const at = (ret) => {
+    const spark = mbt0 - ret, r = mapForTq((m) => tq(S.burn(m, spark)), target, r0.map, maxMap);
+    return r.status === "high" ? null : mk(r.map, spark, mbt0);
+  };
+  let best = p0, worse = 0, hit = 0;
+  for (let k = 1; k <= 25 && !hit; k++) {
+    const p = at(k);
+    if (!p) return { ...best, binding: "map", feasible: false, note: `retarding ${k} deg needs more than ${maxMap} kPa MAP; rod ${best.rodPct.toFixed(0)} %, main ${best.mainPct.toFixed(0)} % of rating at best` };
+    if (fits(p)) { hit = k; best = p; break; }
+    if (loadOf(p) < loadOf(best)) { best = p; worse = 0; } else if (++worse >= 4) break;   // past the minimum: more retard needs more MAP and loads climb again
+  }
+  if (hit) {
+    const half = at(hit - 0.5), p = half && fits(half) ? half : best;
+    return { ...p, binding: bind, note: `retarded ${p.retard.toFixed(1)} deg from MBT to hold ${bind} bearing load at ${lim.toFixed(0)} % of rating` };
+  }
+  return { ...best, binding: bind, feasible: false, note: `no spark in [MBT-25, MBT] holds the ${bind} bearing under ${lim.toFixed(0)} % of rating (best ${loadOf(best).toFixed(0)} %)` };
+}
+
+/**
+ * Ignition table row, deg BTDC per MAP bin (EMU convention): MBT per bin (combustion only), retarded where the peak rod or main unit load
+ * would exceed ratingFrac x rating, never more advance at higher MAP than the bin below, 0.5 deg resolution, clamped to [minSpark, maxSpark].
+ * The returned array carries .mbt (deg per bin, unrounded) and .limited (true where bearing retard applies) for display.
+ * opts: {ratingFrac = 1, minSpark = -10, maxSpark = 45, retardMax = 25}.
+ */
+export function ignRow(ui, rpm, mapBins, opts = {}) {
+  const ratingFrac = opts.ratingFrac ?? 1.0, lim = ratingFrac * 100, minSp = opts.minSpark ?? -10, maxSp = opts.maxSpark ?? 45, retMax = opts.retardMax ?? 25;
+  const S = solverCtx(ui, rpm), n = mapBins.length;
+  const mbt = mapBins.map((m) => S.mbt(m, 0.1));
+  // Monotone MBT: least-squares non-increasing fit (pool adjacent violators), not a running minimum. The model's MBT dips at the lowest MAP bins
+  // at high rpm (17.6 deg at 20 kPa against 27 at 125 kPa, 1FZ 7000 rpm), and a running minimum would pin the whole row to that dip.
+  const blocks = [];
+  mbt.forEach((v) => {
+    blocks.push({ sum: v, n: 1 });
+    while (blocks.length > 1 && blocks[blocks.length - 2].sum / blocks[blocks.length - 2].n < blocks[blocks.length - 1].sum / blocks[blocks.length - 1].n) {
+      const t = blocks.pop(); blocks[blocks.length - 1].sum += t.sum; blocks[blocks.length - 1].n += t.n;
+    }
+  });
+  const iso = blocks.flatMap((bl) => new Array(bl.n).fill(bl.sum / bl.n));
+  const base = iso.map((v) => Math.min(Math.max(HALF(v), minSp), maxSp));          // non-increasing stays non-increasing under clamp and rounding
+  const fitAt = (i, spark) => { const L = S.loads(S.burn(mapBins[i], spark)); return L.rodPct <= lim && L.mainPct <= lim; };
+  const val = base.slice(), limited = new Array(n).fill(false);
+  for (let i = n - 1; i >= 0; i--) {                                              // every bin is checked (a check costs a few ms)
+    if (fitAt(i, base[i])) continue;
+    limited[i] = true;
+    const lowest = Math.max(base[i] - retMax, minSp);
+    if (!fitAt(i, lowest)) { val[i] = lowest; continue; }                       // cannot be met inside the retard range; keep the lowest allowed
+    let lo = 0, hi = Math.round((base[i] - lowest) * 2);                         // half-degree steps of retard: lo does not fit, hi fits
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (fitAt(i, base[i] - mid / 2)) hi = mid; else lo = mid; }
+    val[i] = base[i] - hi / 2;
+  }
+  let run = Infinity;
+  for (let i = 0; i < n; i++) { run = Math.min(run, val[i]); val[i] = run; }   // a retarded bin carries up to the bins above
+  val.mbt = mbt; val.limited = limited;
+  return val;
+}
+
+const csvOf = (corner, xBins, rpmBins, cells, fmt) =>
+  [corner + "," + xBins.join(","), ...rpmBins.map((r, i) => [r, ...cells[i].map(fmt)].join(",")).reverse()].join("\n");   // rpm DESCENDING down the rows
+
+/**
+ * EMU Black tables for the selected engine's bins (engines.js tables).
+ * linePts: solved points [{rpm, boostGauge}] (solvePoint output), any rpm spacing. ignCells: optional rows from ignRow, one per ignition rpm bin
+ *   in ascending rpm; a missing/null row is computed with ignRow (about 1 s each), so a UI can pass rows it has already solved.
+ * ign.cells[rpmIdx][mapIdx] deg BTDC; boost.cells[rpmIdx][pedalIdx] kPa GAUGE (integer); rpm bins ascending in the arrays, DESCENDING in the csv.
+ * boost: full-pedal column = line boost interpolated (linear, ends clamped) to the boost rpm bins, floored at 0; lower pedal bins ramp linearly from
+ *   min(opts.spoolKPa = 60, full) at pedal 0 to the full value at the second-highest pedal bin.
+ */
+export function emuTables(ui, linePts, ignCells, opts = {}) {
+  const u = resolve(ui), T = engOf(u).tables, spool = opts.spoolKPa ?? 60;
+  const icells = T.ignRpm.map((rpm, i) => (ignCells && ignCells[i]) || ignRow(u, rpm, T.ignMap, opts));
+  const pts = [...linePts].sort((a, b) => a.rpm - b.rpm);
+  const line = (rpm) => {
+    if (!pts.length) return 0;
+    if (rpm <= pts[0].rpm) return pts[0].boostGauge;
+    for (let i = 1; i < pts.length; i++) if (rpm <= pts[i].rpm) { const f = (rpm - pts[i - 1].rpm) / (pts[i].rpm - pts[i - 1].rpm); return pts[i - 1].boostGauge + f * (pts[i].boostGauge - pts[i - 1].boostGauge); }
+    return pts[pts.length - 1].boostGauge;
+  };
+  const P = T.boostPedal, knee = P[P.length - 2];
+  const bcells = T.boostRpm.map((rpm) => {
+    const full = Math.max(0, line(rpm)), start = Math.min(spool, full);
+    return P.map((p) => Math.round(start + (full - start) * Math.min(1, p / knee)));
+  });
+  return {
+    ign: { rpmBins: T.ignRpm, mapBins: T.ignMap, cells: icells, csv: csvOf("RPM\\MAP", T.ignMap, T.ignRpm, icells, (v) => v.toFixed(1)) },
+    boost: { rpmBins: T.boostRpm, pedalBins: P, cells: bcells, csv: csvOf("RPM\\PEDAL", P, T.boostRpm, bcells, (v) => String(v)) },
+  };
 }

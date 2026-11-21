@@ -2,10 +2,18 @@
 // Pure, dependency-free ES module. Angles: firing frame, theta = 0 at firing TDC, overlap TDC at +/-360.
 // Lobe fields: adv = duration at 0.1 mm, dur1 = duration at 1 mm (crank deg), lift = net valve lift (mm),
 // cl = centreline (deg ATDC-overlap for intake, BTDC-overlap for exhaust). Source: kelford-1fz-cams.md.
+// v0.4: a lobe may be quoted at ANY two reference lifts: pts = [[ref mm, duration deg], [ref mm, duration deg]] (0.050 in = 1.27 mm).
+// The 1FZ lobes are pts [[0.1, adv], [1, dur1]]. For other lobes adv and dur1 are DERIVED from the fitted shape (informational).
 
 export const THETA = Float64Array.from({ length: 1440 }, (_, i) => -360 + 0.5 * i);
 
-const L = (side, adv, dur1, lift, cl) => ({ side, adv, dur1, lift, cl });
+const L = (side, adv, dur1, lift, cl) => ({ side, adv, dur1, lift, cl, pts: [[0.1, adv], [1, dur1]] });
+// Lobe quoted at two arbitrary reference lifts. adv/dur1 (at 0.1 and 1 mm) are filled in from the fitted shape.
+const Lr = (side, lift, cl, pts) => {
+  const o = { side, lift, cl, pts };
+  o.adv = durAt(o, 0.1); o.dur1 = durAt(o, 1.0);
+  return o;
+};
 const KELFORD = "Kelford via CJ Motor retailer page (Kelford site itself returned 403)";
 
 export const CAMS = {
@@ -51,15 +59,18 @@ export const CAMS = {
 };
 
 // ---- lift shape: g(t) = cos^n(pi t / (2 t0)), |t| < t0 (t = crank deg from lobe centre) -------------------
-// Fitted so lift = 0.1 mm at |t| = adv/2 and 1.0 mm at |t| = dur1/2 (exact). C1 at the ends since n > 1.
+// Fitted so the lobe passes through its two quoted (reference lift, duration) points exactly (1FZ: 0.1 mm and 1.0 mm).
+// C1 at the ends since n > 1.
 const shapeCache = new Map();
+/** The two quoted points, lowest reference lift first: [[ref mm, duration deg], ...]. Lobes without pts use adv @0.1 mm / dur1 @1 mm. */
+const ptsOf = (lobe) => (lobe.pts || [[0.1, lobe.adv], [1, lobe.dur1]]).slice().sort((a, b) => a[0] - b[0]);
 export function fitShape(lobe) {
-  const key = `${lobe.adv}|${lobe.dur1}|${lobe.lift}`;
+  const pts = ptsOf(lobe), key = `${pts.join("|")}|${lobe.lift}`;
   if (shapeCache.has(key)) return shapeCache.get(key);
-  const a = lobe.adv / 2, d = lobe.dur1 / 2, Lf = lobe.lift;
-  const nOf = (t0) => Math.log(1 / Lf) / Math.log(Math.cos((Math.PI * d) / (2 * t0)));
-  const res = (t0) => nOf(t0) * Math.log(Math.cos((Math.PI * a) / (2 * t0))) - Math.log(0.1 / Lf);
-  let lo = a * 1.0000001, hi = a * 50; // t0 must exceed a (the 0.1 mm point is inside the lobe)
+  const [[r1, d1], [r2, d2]] = pts, a = d1 / 2, d = d2 / 2, Lf = lobe.lift;
+  const nOf = (t0) => Math.log(r2 / Lf) / Math.log(Math.cos((Math.PI * d) / (2 * t0)));
+  const res = (t0) => nOf(t0) * Math.log(Math.cos((Math.PI * a) / (2 * t0))) - Math.log(r1 / Lf);
+  let lo = a * 1.0000001, hi = a * 50; // t0 must exceed a (the lower reference point is inside the lobe)
   const rl = res(lo);
   for (let i = 0; i < 200; i++) {
     const mid = 0.5 * (lo + hi);
@@ -75,6 +86,14 @@ export function fitShape(lobe) {
 export function lobeLift(lobe, t) {
   const { n, t0 } = fitShape(lobe);
   return Math.abs(t) >= t0 ? 0 : lobe.lift * Math.pow(Math.cos((Math.PI * t) / (2 * t0)), n);
+}
+
+/** Lobe duration (crank deg) at a reference lift ref (mm): the quoted value if ref is one of the quoted points, else from the fitted shape. */
+export function durAt(lobe, ref) {
+  for (const [r, d] of ptsOf(lobe)) if (Math.abs(r - ref) < 1e-9) return d;
+  if (ref >= lobe.lift) return 0;
+  const { n, t0 } = fitShape(lobe);
+  return 2 * (2 * t0 / Math.PI) * Math.acos(Math.pow(ref / lobe.lift, 1 / n));
 }
 
 const wrap720 = (x) => ((((x + 360) % 720) + 720) % 720) - 360;
@@ -104,6 +123,42 @@ export function camEvents(cam, inAdv = 0, exAdv = 0) {
   o.lsa = (cam.in.cl + cam.ex.cl) / 2;
   return o;
 }
+
+/** Event angles (firing-frame deg) at an arbitrary reference lift ref (mm), same keys as camEvents without suffix. 0.050 in = 1.27 mm. */
+export function camEventsAt(cam, inAdv = 0, exAdv = 0, ref = 1.27) {
+  const ci = centre(cam.in, inAdv), ce = centre(cam.ex, exAdv), hi = durAt(cam.in, ref) / 2, he = durAt(cam.ex, ref) / 2;
+  const o = { ivo: ci - hi, ivc: ci + hi, evo: ce - he, evc: ce + he };
+  o.overlap = Math.max(0, o.evc - o.ivo - 720);
+  return o;
+}
+
+// ---- 2JZ cam set (v0.4) ---------------------------------------------------------------------------------------
+// Installed: Brian Crower BC0311 Stage 2, card on file 2026-07-10 [build notes, emap_map_ratio_cam_overlap.md s.3]:
+// 264 deg advertised / 218 deg @ 0.050 in (1.27 mm), lift 8.74 mm, ICL 110 / ECL 118, intake VVT parked (inAdv 0).
+// Check: ICL 110 +/- 132 -> IVO 22 BTDC / IVC 62 ABDC; ECL 118 +/- 132 -> EVC 14 ATDC; at 109 half-duration IVO 1 ATDC, IVC 39 ABDC,
+// EVC 9 BTDC, EVO 47 BBDC, all as the card. ASSUMPTION: the "264 advertised" duration is quoted at 0.15 mm (0.006 in, SAE-style); BC does not
+// say. Moving that reference to 0.1 mm changes the 1 mm events by ~1 deg and the flow integral by under 1 %.
+const BC_NOTE = "Brian Crower BC0311 Stage 2 card on file 2026-07-10 (build notes emap_map_ratio_cam_overlap.md s.3). 264 deg advertised ASSUMED at 0.15 mm (0.006 in); " +
+  "218 deg @ 0.050 in; lift 8.74 mm; ICL 110 / ECL 118 with the intake phaser parked.";
+// Stock 2JZ-GE VVT-i: duration 233 in / 226 ex and lift 8.26 / 8.41 mm [web: australiancar.reviews, motorreviewer]; timing "IVO 12 ATDC ... IVC 65 ABDC, EVO 40 BBDC,
+// EVC 6 ATDC" [web, unverified, internally odd] gives centrelines: ICL (12 + 245) / 2 = 128.5 at the parked (retarded) phaser, ECL 107.
+// Duration at 0.050 in is NOT published: taken as quoted - 42 deg (ESTIMATE; the BC card has 46, the 1FZ stock estimate 38). Quoted duration ref assumed 0.15 mm.
+const STOCK_2JZ_NOTE = "ESTIMATE, UNVERIFIED. Duration 233/226 and lift 8.26/8.41 mm from web pages (australiancar.reviews, motorreviewer); centrelines " +
+  "128.5/107 derived from unverified web event angles (IVO 12 ATDC, IVC 65 ABDC, EVO 40 BBDC, EVC 6 ATDC, phaser retarded); 0.050 in duration estimated as quoted - 42.";
+export const CAMS_2JZ = {
+  "Stock": {
+    label: "Stock 2JZ-GE VVT-i", use: "Factory",
+    in: Lr("in", 8.26, 128.5, [[0.15, 233], [1.27, 191]]), ex: Lr("ex", 8.41, 107, [[0.15, 226], [1.27, 184]]),
+    springs: "Stock", source: STOCK_2JZ_NOTE, verified: false,
+  },
+  "BC0311-S2": {
+    label: "Brian Crower BC0311 Stage 2", use: "Installed (VVT-i phaser parked = 0 advance)",
+    in: Lr("in", 8.74, 110, [[0.15, 264], [1.27, 218]]), ex: Lr("ex", 8.74, 118, [[0.15, 264], [1.27, 218]]),
+    springs: "not recorded", source: BC_NOTE, verified: true,
+  },
+};
+/** Cam sets by engine key (engines.js camSet). Each set's first entry is the stock grind. */
+export const CAM_SETS = { "1FZ-FE": CAMS, "2JZ": CAMS_2JZ };
 
 // ---- VE: port of turbo-dyno-projection/project.py (stock VE curve stretched by flow-integral ratio) ----
 function pchip(x, y) { // scipy PchipInterpolator derivatives (Fritsch-Carlson), evaluated with clamping
@@ -140,28 +195,42 @@ const veStock = pchip(STOCK_RPM, STOCK_RPM.map((n, i) =>
   ((STOCK_TQ[i] * 1.3558 * 4 * Math.PI / VD + fmep(n) + 0.15 * BAR) / (1 - FRIC_LOAD)) / (RHO_REF * Q_GAS * ETA_GAS)));
 
 const HEAD_CFM = 245, VALVE_D = 37.0; // peak port flow (Will); valve head diameter assumed (as project.py)
-const flowLift = pchip([0, .1, .2, .25, .3, .35, 1].map((v) => v * VALVE_D), [0, .42, .78, .90, .97, 1, 1].map((v) => v * HEAD_CFM));
+const flowLiftFor = (valveD) => pchip([0, .1, .2, .25, .3, .35, 1].map((v) => v * valveD), [0, .42, .78, .90, .97, 1, 1].map((v) => v * HEAD_CFM));
+const flowLift = flowLiftFor(VALVE_D);
 
 const taCache = new Map();
-/** Port flow integrated over the intake event (cfm x crank deg), using THIS module's fitted lobe shape. */
-export function timeArea(lobe) {
-  const key = `${lobe.adv}|${lobe.dur1}|${lobe.lift}`;
+/** Port flow integrated over the intake event (cfm x crank deg), using THIS module's fitted lobe shape. valveD (mm) only rescales lift/D. */
+export function timeArea(lobe, valveD = VALVE_D) {
+  const key = `${ptsOf(lobe).join("|")}|${lobe.lift}|${valveD}`;
   if (taCache.has(key)) return taCache.get(key);
-  const { t0 } = fitShape(lobe), dt = 0.25;
+  const { t0 } = fitShape(lobe), dt = 0.25, fl = valveD === VALVE_D ? flowLift : flowLiftFor(valveD);
   let s = 0;
-  for (let t = -t0 + dt / 2; t < t0; t += dt) s += flowLift(lobeLift(lobe, t)) * dt;
+  for (let t = -t0 + dt / 2; t < t0; t += dt) s += fl(lobeLift(lobe, t)) * dt;
   taCache.set(key, s);
   return s;
 }
 
 /**
- * VE at rpm: stock VE curve evaluated at rpm * TA_stock / TA_cam (VE as a function of inlet Mach index).
- * Depends on the INTAKE lobe only. Cam advance does NOT change VE here: the flow integral is shift-invariant
+ * VE at rpm. Depends on the INTAKE lobe only. Cam advance does NOT change VE here: the flow integral is shift-invariant
  * and IVC-timing/ram effects are not modelled (project.py doesn't either).
+ * basis undefined (1FZ): stock VE curve evaluated at rpm * TA_stock / TA_cam (VE as a function of inlet Mach index).
+ * basis {set, cam, rpm[], ve[], valveD}: measured VE(rpm) table for the basis cam (engines.js veBasis); another grind is read at
+ *   rpm * TA_basis / TA_cam, the same flow-integral scaling, with the rpm clamped to the table's range.
  */
-export function camVE(cam, inAdv, exAdv, rpm) {
-  const ratio = timeArea(CAMS.Stock.in) / timeArea(cam.in);
-  return veStock(Math.min(Math.max(rpm * ratio, 1000), 7000));
+export function camVE(cam, inAdv, exAdv, rpm, basis) {
+  if (!basis || basis.kind === "project.py") {
+    const ratio = timeArea(CAMS.Stock.in) / timeArea(cam.in);
+    return veStock(Math.min(Math.max(rpm * ratio, 1000), 7000));
+  }
+  const bc = CAM_SETS[basis.set][basis.cam], vd = basis.valveD || VALVE_D, x = basis.rpm;
+  const ratio = timeArea(bc.in, vd) / timeArea(cam.in, vd);
+  const f = basisInterp(basis);
+  return f(Math.min(Math.max(rpm * ratio, x[0]), x[x.length - 1]));
+}
+const basisCache = new WeakMap();
+function basisInterp(basis) {
+  if (!basisCache.has(basis)) basisCache.set(basis, pchip(basis.rpm, basis.ve));
+  return basisCache.get(basis);
 }
 
 /**

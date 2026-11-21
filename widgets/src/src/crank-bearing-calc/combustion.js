@@ -38,6 +38,9 @@ const blend = (w) => {   // w = ethanol mass fraction; mass-weighted properties 
 export const FUELS = {
   "91":  { label: "91 gasoline (AKI)", ...GAS, octane: 96, slCoef: { ...GAS_SL } },
   "93":  { label: "93 gasoline (AKI)", ...GAS, octane: 98, slCoef: { ...GAS_SL } },   // same flame data as 91
+  // E60 (v0.4): 60 % ethanol by volume = 0.614 by mass (0.6 x 0.789 / (0.6 x 0.789 + 0.4 x 0.745), densities kg/L; the same arithmetic gives
+  // E85 = 0.857). Mass blend of the verified ethanol and gasoline rows, like E85. octane is an interpolated RON, not used by the model.
+  "E60": { label: "E60 (60 % ethanol by volume, 0.614 by mass)", ...blend(0.614), octane: 102 },
   "E85": { label: "E85 (85 % ethanol by volume, 0.857 by mass)", ...blend(0.857), octane: 106 },
   "E100": { label: "E100 ethanol", ...ETOH, octane: 109, slCoef: { ...ETOH_SL } },
   "M100": { label: "M100 methanol", lhv: 19.9e6, afrSt: 6.43, hvap: 1100e3, octane: 109, slCoef: { ...MEOH_SL } },
@@ -197,11 +200,11 @@ export function cylinderPressure(op, g) {
   };
 }
 
-// Spark advance (deg BTDC) maximising imepGross, golden-section on [0, 50].
-export function findMBT(op, g) {
+// Spark advance (deg BTDC) maximising imepGross, golden-section on [0, 50]. tol (deg, default 0.02) is the final bracket width.
+export function findMBT(op, g, tol = 0.02) {
   const J = (s) => cylinderPressure({ ...op, spark: s }, g).imepGross, gr = (Math.sqrt(5) - 1) / 2;
   let a = 0, b = 50, c = b - gr * (b - a), d = a + gr * (b - a), fc = J(c), fd = J(d);
-  while (b - a > 0.02) {
+  while (b - a > tol) {
     if (fc > fd) { b = d; d = c; fd = fc; c = b - gr * (b - a); fc = J(c); }
     else { a = c; c = d; fc = fd; d = a + gr * (b - a); fd = J(d); }
   }
