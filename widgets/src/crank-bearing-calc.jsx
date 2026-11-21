@@ -264,7 +264,7 @@ export default function BearingStress() {
     if (cc) pser.push({ y: nz(cc.p, cpm), color: C.c[0], name: "N/A p", dash: "2 3", faint: true }, { y: cc.xb, color: C.c[3], name: "N/A MFB", axis: "r", dash: "1 3", faint: true });
     body = (<>
       {(starved || r.warnings.length > 0) && <div className="bsc-warn">
-        {starved && <div><b>Oil starvation warning:</b> pressure-fed supply is below hydrodynamic side leakage at peak eccentricity ({[r.rod.starved ? "rod" : null, ...r.mains.map((m, i) => (m.starved ? "main " + (i + 1) : null))].filter(Boolean).join(", ")}).</div>}
+        {starved && <div><b>Oil supply warning:</b> the feed hole cannot pass the mean oil demand at the available pressure ({[r.rod.starved ? "rod" : null, ...r.mains.map((m, i) => (m.starved ? "main " + (i + 1) : null))].filter(Boolean).join(", ")}).</div>}
         {r.warnings.map((w, i) => <div key={i}>{w}</div>)}</div>}
       <div className="bsc-tiles">
         <Tile label="Torque" value={fmt(r.torque.meanLbft, 0)} unit="lb-ft" sub={`${fmt(r.torque.meanNm, 0)} Nm`} />
@@ -279,7 +279,7 @@ export default function BearingStress() {
         <Tile label="Peak side thrust" value={fmt(Math.abs(f.sidePeak), 2)} unit="kN" sub={`${f.sidePeak >= 0 ? "major (+)" : "minor (-)"} @ ${fmt(f.sidePeakTheta, 0)}${deg}`} />
         <Tile label="Rod film temp / visc." value={fmt(r.rod.tFilmC, 0)} unit={deg + "C"} sub={`${fmt(r.rod.muFilm, 2)} mPa.s / ${fmt(r.rod.qLmin, 1)} L/min`} />
         <Tile label="Main film temp / visc." value={fmt(wm.tFilmC, 0)} unit={deg + "C"} sub={`${fmt(wm.muFilm, 2)} mPa.s`} />
-        <Tile label="Oil supply" value={starved ? "STARVED" : "OK"} color={starved ? C.bad : C.ok} />
+        <Tile label="Oil supply" value={starved ? "STARVED" : "OK"} sub={`feed-hole margin ${fmt(Math.min(r.rod.supplyMargin ?? Infinity, ...r.mains.map((m) => m.supplyMargin ?? Infinity)), 0)}×`} color={starved ? C.bad : C.ok} />
         <Tile label="Binding limit" value={BIND[lim.binding] || lim.binding} sub={Object.entries(lim.margins).map(([k, v]) => `${BIND[k] || k} ${v >= 0 ? "+" : ""}${fmt(v * 100, 0)}%`).join(" / ")} color={C.accent} />
       </div>
 
@@ -342,7 +342,7 @@ export default function BearingStress() {
           <Tile label="h min" value={fmt(r.rod.hMin, 2)} unit={mu + "m"} sub={`eps max ${fmt(r.rod.eps, 2)}`} color={filmCol(r.rod.hMin)} />
           <Tile label="Film temp / visc." value={fmt(r.rod.tFilmC, 0)} unit={deg + "C"} sub={`${fmt(r.rod.muFilm, 2)} mPa.s`} />
           <Tile label="Oil flow" value={fmt(r.rod.qLmin, 2)} unit="L/min" />
-          <Tile label="Oil supply" value={r.rod.starved ? "STARVED" : "OK"} color={r.rod.starved ? C.bad : C.ok} /></div>
+          <Tile label="Oil supply" value={r.rod.starved ? "STARVED" : "OK"} sub={r.rod.supplyMargin != null ? `pin feed ${fmt(r.rod.pFeedKPa / 6.89476, 0)} psi, hole ${fmt(r.rod.qOrificeLmin, 1)} vs ${fmt(r.rod.qDemandLmin, 2)} L/min` : ""} color={r.rod.starved ? C.bad : C.ok} /></div>
         <div className="bsc-panel"><h3>Unit load and peak film pressure</h3>
           <LineChart C={C} x={th} xlabel={`crank angle (${deg} ATDC firing)`} ylabel="MPa" series={[{ y: rb.unit, color: C.c[2], name: "unit load" }, { y: rb.pFilm, color: C.c[4], name: "film pressure" }]}
             hlines={[{ y: rating, label: `rating ${rating} MPa`, color: C.bad }]} xticks={[-360, -180, 0, 180, 360]} />
@@ -660,12 +660,13 @@ const EQ = {
     { h: "Oil" },
     ["log_{10} log_{10}(ν + 0.7) = A − B log_{10} T;   μ = ν ρ;   ρ = 860 − 0.65 (T − 288.15) kg/m^{3}", "Walther / ASTM D341 through the grade's KV40 and KV100 (typical values per grade, not a specific product)."],
     ["μ_{film} = μ(T) · HTHS_{150} / μ(150 °C)", "Shear-thinning scale so the curve meets the grade's typical HTHS viscosity at 150 °C."],
-    { h: "Film temperature, flow and starvation" },
+    { h: "Film temperature, flow and oil supply" },
     ["T_{film} = T_{sup} + P_f / (ρ c_p Q);   c_p = 2000 J/kg·K (rise capped at 150 K)", "Fixed point on T (relaxed 0.5, stop at 0.1 K): hotter → thinner → more friction."],
     ["P_f = mean_θ [ μ π d l_e n U^{2} / (c √(1 − ε^{2})) ];   U = |ω_{journal} − ω_{sleeve}| d/2", "Petroff friction with an eccentricity factor over the full circumference (biased hot)."],
     ["Q = Q_{feed} + Q_{side};   Q_{feed} = min( π d c^{3} p_s (1 + 1.5 ε^{2}) / (6 μ L_e),  0.6 · (π/4) d_f^{2} √(2 p_s/ρ) )", "Martin-form land flow capped by the feed-hole orifice (C_d 0.6, no passage losses). L_e = (l − groove)/2; mean ε^{2} over the cycle. p_s = gallery pressure."],
     ["Q_{side} = n_{lands} · mean( c l_e d |M| )", "Squeeze-out through both ends from the film solution."],
-    ["starved ⇔ Q_{feed}(ε_{max}) < Q_{side}(ε_{max})", "Flag when the supply can't replace what leaks at peak eccentricity."],
+    ["Q_{hole} = 0.6 · (π/4) d_f^{2} √(2 p_{feed}/ρ);   Q_{demand} = mean Q_{side} + π d c^{3} p_{feed} (1 + 1.5 ε^{2}) / (6 μ L_e)", "Oil the feed hole can pass at the available pressure, against the bearing's cycle-mean demand. The journal pumps its own side leakage as long as the hole is flooded, so demand is a mean, not the peak-instant squeeze-out."],
+    ["supply margin = Q_{hole} / Q_{demand};   starved ⇔ p_{feed} ≤ 0 or margin < 1", "p_{feed} = gallery pressure for mains; for the rod, gallery + ρω^{2}(r^{2} − (d_{main}/2)^{2})/2 (cross-drilling head). Not modelled: pump capacity, passage losses, aeration — OK means the feed hole is not the limit."],
     { h: "Edge film and ratings" },
     ["h_{edge}(θ) = h(θ) − |slope(θ)| · l/2;   edge film = min_θ h_{edge}", "Rigid shell tilted by the journal slope. Ignores shell conformability and housing tilt, so it reads pessimistic; ≤ 0 flags edge contact."],
     ["unit load = max|F| / (d (l − groove));   worst main = smallest of (rating/σ − 1, h_{min}/h_{accept} − 1 [, edge])", "Main journal 69 mm. Peak film pressure per main uses the rod-bearing method (see Rod bearing tab)."],

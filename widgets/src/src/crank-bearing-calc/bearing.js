@@ -260,9 +260,18 @@ export function oilFlowAndTemp(brg, filmFn, pS, feedD, oil, tSupplyK, rpm, isRod
     }
     pf /= N; qs = qs / N * n; e2 /= N;
     const qFeed = feedFlow(brg, feedD, pS, mu, e2, T), q = qFeed + qs;
-    const qFeedPk = feedFlow(brg, feedD, pS, mu, f.eps[iMax] ** 2, T), qSidePk = f.qSide[iMax] * n;
+    // Supply check (2026-11-21, replaces "pressure-fed flow < side leakage at peak eccentricity", which was not a
+    // starvation criterion: the journal pumps its own side leakage through the bearing as long as the feed hole is
+    // flooded, and the peak-instant squeeze outflow is refilled later in the cycle). Starved when the oil available at
+    // the hole cannot carry the bearing's cycle-mean demand: feed pressure <= 0 (e.g. rod drilling emptied), or the
+    // feed-hole orifice at that pressure passes less than mean side leakage + pressure-driven gap flow.
+    // Not modelled: pump capacity, passage losses, aeration. So "ok" means the hole is not the limit, nothing more.
+    const qOr = CD_HOLE * PI / 4 * feedD ** 2 * Math.sqrt(2 * Math.max(pS, 0) / rho);
+    const g = brg.groove || 0, qGap = PI * brg.d * brg.c ** 3 * Math.max(pS, 0) * (1 + 1.5 * e2) / (6 * mu * (brg.l - g) / 2);
+    const qDemand = qs + qGap, supplyMargin = pS > 0 ? qOr / qDemand : 0;
     const Tn = ov ? tSupplyK : tSupplyK + Math.min(pf / (rho * CP_OIL * q), 150);   // T_film = T_supply + P/(rho cp Q)
-    res = { tFilm: Tn, muFilm: mu, q, qFeed, qSide: qs, starved: qFeedPk < qSidePk, pFric: pf, film: f, iterations: it + 1 };
+    res = { tFilm: Tn, muFilm: mu, q, qFeed, qSide: qs, qOrifice: qOr, qDemand, supplyMargin, pFeed: pS, starved: supplyMargin < 1,
+      pFric: pf, film: f, iterations: it + 1 };
     if (ov || fixed || Math.abs(Tn - T) < 0.1) break;
     T = 0.5 * (T + Tn);        // relaxed: hotter -> thinner -> more eccentric -> more friction can run away undamped
   }
@@ -290,7 +299,8 @@ export function bearingAnalysis(inp, p) {
   const rr = oneBearing(rb, F.pinX.map((v) => -v), F.pinY.map((v) => -v), F.wbar, F.slideRod, pRod, oil, rpm);
   const pkRod = amax(mag(F.pinX, F.pinY)), aRod = (rb.l - (rb.groove || 0)) * rb.d;
   const rod = { polar: { x: scale(F.rodX, 1e-3), y: scale(F.rodY, 1e-3) }, peakKN: pkRod / 1e3, peakMPa: pkRod / aRod / 1e6, pctRating: pkRod / aRod / rating * 100,
-    h: scale(rr.film.h, um), hMin: rr.film.hMin * um, eps: rr.film.epsMax, tFilmC: rr.tFilm - 273.15, muFilm: rr.muFilm * 1e3, qLmin: rr.q * 6e4, qFeedLmin: rr.qFeed * 6e4, qSideLmin: rr.qSide * 6e4, starved: rr.starved };
+    h: scale(rr.film.h, um), hMin: rr.film.hMin * um, eps: rr.film.epsMax, tFilmC: rr.tFilm - 273.15, muFilm: rr.muFilm * 1e3, qLmin: rr.q * 6e4, qFeedLmin: rr.qFeed * 6e4, qSideLmin: rr.qSide * 6e4, starved: rr.starved,
+    supplyMargin: rr.supplyMargin, qOrificeLmin: rr.qOrifice * 6e4, qDemandLmin: rr.qDemand * 6e4, pFeedKPa: rr.pFeed / 1e3 };
   // ---- mains: beam load share, then a film per main
   const pin6x = phaseCylinders(F.loadX), pin6y = phaseCylinders(F.loadY), pin6 = pin6x.map((x, i) => ({ x, y: pin6y[i] }));
   const ml = mainLoads(pin6, crank, rpm), mb = B.main, aMain = (mb.l - (mb.groove || 0)) * mb.d;
@@ -303,12 +313,13 @@ export function bearingAnalysis(inp, p) {
     let edge = Infinity, sMax = 0;
     for (let i = 0; i < N; i++) { edge = Math.min(edge, f.h[i] - ml.slope[m][i] * mb.l / 2); sMax = Math.max(sMax, ml.slope[m][i]); if (lm[i] > peakAt.v) { peakAt.v = lm[i]; peakAt.i = i; } }
     mains.push({ peakKN: pk / 1e3, peakMPa: pk / aMain / 1e6, pctRating: pk / aMain / rating * 100, hMin: f.hMin * um, edgeFilm: edge * um, slopeMrad: sMax * 1e3,
-      tFilmC: t.tFilm - 273.15, muFilm: t.muFilm * 1e3, qLmin: t.q * 6e4, qFeedLmin: t.qFeed * 6e4, qSideLmin: t.qSide * 6e4, starved: t.starved });
+      tFilmC: t.tFilm - 273.15, muFilm: t.muFilm * 1e3, qLmin: t.q * 6e4, qFeedLmin: t.qFeed * 6e4, qSideLmin: t.qSide * 6e4, starved: t.starved,
+      supplyMargin: t.supplyMargin, qOrificeLmin: t.qOrifice * 6e4, qDemandLmin: t.qDemand * 6e4, pFeedKPa: t.pFeed / 1e3 });
     films.push(f); mainsRaw.push({ load: { x: L.x, y: L.y }, eps: f.eps, ...landsOf(mb) });
     if (edge <= 0) warnings.push(`Main ${m + 1}: edge film ${(edge * um).toFixed(2)} um, journal slope puts the shell edge in contact`);
-    if (t.starved) warnings.push(`Main ${m + 1}: pressure-fed supply below side leakage at peak eccentricity (starvation risk)`);
+    if (t.starved) warnings.push(`Main ${m + 1}: feed hole cannot supply the bearing's mean oil demand at ${(t.pFeed / 6894.76).toFixed(0)} psi (margin ${t.supplyMargin.toFixed(2)})`);
   }
-  if (rod.starved) warnings.push("Rod bearing: pressure-fed supply below side leakage at peak eccentricity (starvation risk)");
+  if (rod.starved) warnings.push(`Rod bearing: oil at the crankpin cannot supply the mean demand (feed ${(rod.pFeedKPa / 6.89476).toFixed(0)} psi, margin ${rod.supplyMargin.toFixed(2)})`);
   // worst main: smallest of its load, film and edge-film margins
   // (edge film enters only when inp.edgeInLimit is set; calc.js leaves it off by default)
   const mm = (q) => Math.min(rating / (q.peakMPa * 1e6) - 1, q.hMin * 1e-6 / hMinAccept - 1, inp.edgeInLimit ? q.edgeFilm * 1e-6 / hMinAccept - 1 : Infinity);
